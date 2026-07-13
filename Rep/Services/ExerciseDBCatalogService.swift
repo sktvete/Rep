@@ -758,10 +758,7 @@ private extension ExerciseDBCatalogService {
     }
 
     func joinedInstructions(_ instructions: [String]) -> String {
-        instructions
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-            .joined(separator: "\n\n")
+        ExerciseInstructionFormatter.joined(from: instructions)
     }
 
     func validatedMediaURLString(_ value: String) -> String? {

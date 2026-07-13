@@ -11,7 +11,7 @@ struct RepeatStepButton: View {
     var body: some View {
         Image(systemName: systemImage)
             .font(.subheadline.weight(.bold))
-            .foregroundStyle(.secondary)
+            .repSecondaryText()
             .frame(width: 32, height: 44)
             .contentShape(Rectangle())
             .accessibilityLabel(accessibilityLabel)

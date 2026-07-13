@@ -25,6 +25,7 @@ struct RepApp: App {
 
 private struct AppRootView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.colorScheme) private var systemColorScheme
     @Query private var settings: [UserSettings]
 
     @State private var presentedWorkout: WorkoutSession?
@@ -53,7 +54,9 @@ private struct AppRootView: View {
                 SettingsView()
             }
         }
-        .tint(RepVisualSystem.tint)
+        .tint(themeTint)
+        .environment(\.repThemeSettings, themeSettings)
+        .preferredColorScheme(preferredColorScheme)
         .repTabBarBehavior()
         .fullScreenCover(item: $presentedWorkout) { session in
             ActiveWorkoutView(session: session) {
@@ -78,6 +81,31 @@ private struct AppRootView: View {
         }
     }
 
+    private var preferredColorScheme: ColorScheme? {
+        switch settings.first?.appearancePreference ?? .system {
+        case .system: nil
+        case .light: .light
+        case .dark: .dark
+        }
+    }
+
+    private var themeTint: Color {
+        themeSettings.resolved(for: activeColorScheme).accent
+    }
+
+    private var activeColorScheme: ColorScheme {
+        switch settings.first?.appearancePreference ?? .system {
+        case .system: systemColorScheme
+        case .light: .light
+        case .dark: .dark
+        }
+    }
+
+    private var themeSettings: RepThemeSettings {
+        guard let settings = settings.first else { return RepThemeSettings() }
+        return RepThemeSettings(settings: settings)
+    }
+
     private func present(_ session: WorkoutSession) {
         presentedWorkout = session
     }
@@ -99,7 +127,9 @@ private struct AppRootView: View {
     private func bootstrapLocalStore() {
         do {
             _ = try ExerciseSeedService.seedIfNeeded(in: modelContext)
-            if settings.isEmpty {
+            if let existing = settings.first {
+                UserSettingsThemeMigration.backfill(existing)
+            } else {
                 modelContext.insert(UserSettings())
             }
             try modelContext.save()

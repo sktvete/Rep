@@ -14,17 +14,25 @@ struct CreateRoutineView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Routine") {
-                    LabeledContent {
-                        TextField("Routine name", text: $name)
-                            .multilineTextAlignment(.trailing)
-                            .textInputAutocapitalization(.words)
-                            .submitLabel(.done)
-                    } label: {
-                        Label("Name", systemImage: "textformat")
+                Section {
+                    VStack(alignment: .leading, spacing: 0) {
+                        LabeledContent {
+                            TextField("Routine name", text: $name)
+                                .multilineTextAlignment(.trailing)
+                                .textInputAutocapitalization(.words)
+                                .submitLabel(.done)
+                        } label: {
+                            Label("Name", systemImage: "textformat")
+                        }
+
+                        Divider().padding(.vertical, 12)
+
+                        TextField("Notes (optional)", text: $notes, axis: .vertical)
+                            .lineLimit(2...5)
                     }
-                    TextField("Notes (optional)", text: $notes, axis: .vertical)
-                        .lineLimit(2...5)
+                    .repThemedListSection()
+                } header: {
+                    RepSectionHeader(title: "Routine")
                 }
 
                 Section {
@@ -34,6 +42,7 @@ struct CreateRoutineView: View {
                             Text(exercise.name)
                                 .fontWeight(.medium)
                         }
+                        .repThemedListRow(padding: 12)
                     }
                     .onDelete { selectedExercises.remove(atOffsets: $0) }
                     .onMove { selectedExercises.move(fromOffsets: $0, toOffset: $1) }
@@ -43,9 +52,10 @@ struct CreateRoutineView: View {
                     } label: {
                         Label("Add Exercise", systemImage: "plus.circle.fill")
                     }
+                    .repThemedListRow()
                 } header: {
                     HStack {
-                        Text("Exercises")
+                        RepSectionHeader(title: "Exercises")
                         Spacer()
                         if selectedExercises.count > 1 { EditButton().textCase(nil) }
                     }
@@ -53,7 +63,7 @@ struct CreateRoutineView: View {
                     Text("You can configure sets, repetitions, and rest after creating the routine.")
                 }
             }
-            .scrollContentBackground(.hidden)
+            .repThemedList()
             .background(RepScreenBackground())
             .navigationTitle("New Routine")
             .navigationBarTitleDisplayMode(.inline)

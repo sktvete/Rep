@@ -52,6 +52,7 @@ enum ExercisePopularity {
         "Barbell Curl",
         "Dumbbell Curl",
         "Triceps Pushdown",
+        "Tricep Pushdown",
         "Dumbbell Lateral Raise",
         "Seated Cable Row",
         "Leg Extension",

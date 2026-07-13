@@ -175,7 +175,7 @@ enum ExerciseSearchEngine {
 
     private static func phraseScore(_ query: String, document: SearchDocument) -> Int {
         if document.namePhrase == query { return 10_000 }
-        if document.aliasPhrases.contains(query) { return 8_500 }
+        if document.aliasPhrases.contains(query) { return 10_000 }
         // A query that equals a whole name token (e.g. "squat" in "Back Squat") should
         // not lose to a name-prefix match on a longer first token (e.g. "Squat Jerk").
         if document.nameTokens.contains(query) { return 3_200 }

@@ -33,7 +33,7 @@ struct ExerciseQuickAddList: View {
                     if let header {
                         Text(header)
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .repSecondaryText()
                             .listRowBackground(Color.clear)
                             .listRowSeparator(.hidden)
                     }
@@ -56,13 +56,13 @@ struct ExerciseQuickAddList: View {
                        exercises.count > searchModel.displayed.count {
                         Text("Type to search \(exercises.count) exercises")
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .repSecondaryText()
                             .frame(maxWidth: .infinity, alignment: .center)
                             .listRowBackground(Color.clear)
                     } else if let footer {
                         Text(footer)
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .repSecondaryText()
                             .frame(maxWidth: .infinity, alignment: .center)
                             .listRowBackground(Color.clear)
                     }

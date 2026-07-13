@@ -32,7 +32,7 @@ final class HapticEngineManager {
         }
     }
 
-    func playStrongBurst(duration: TimeInterval = 0.11) {
+    func playStrongBurst(duration: TimeInterval = 0.2) {
         guard let engine else { return }
 
         do {
@@ -44,12 +44,17 @@ final class HapticEngineManager {
                 relativeTime: 0,
                 duration: duration
             )
-            let transient = CHHapticEvent(
+            let midTap = CHHapticEvent(
                 eventType: .hapticTransient,
                 parameters: [intensity, sharpness],
-                relativeTime: duration + 0.02
+                relativeTime: duration * 0.55
             )
-            let pattern = try CHHapticPattern(events: [continuous, transient], parameters: [])
+            let endTap = CHHapticEvent(
+                eventType: .hapticTransient,
+                parameters: [intensity, sharpness],
+                relativeTime: duration + 0.03
+            )
+            let pattern = try CHHapticPattern(events: [continuous, midTap, endTap], parameters: [])
             let player = try engine.makePlayer(with: pattern)
             try player.start(atTime: CHHapticTimeImmediate)
         } catch {
@@ -93,7 +98,7 @@ enum HapticFeedback {
             HapticEngineManager.shared.playStrongBurst()
 
             guard index < 2 else { continue }
-            try? await Task.sleep(for: .milliseconds(160))
+            try? await Task.sleep(for: .milliseconds(230))
         }
     }
 }

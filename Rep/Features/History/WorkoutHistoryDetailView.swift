@@ -25,7 +25,7 @@ struct WorkoutHistoryDetailView: View {
                             Label("Notes", systemImage: "note.text")
                                 .font(.headline)
                             Text(session.notes)
-                                .foregroundStyle(.secondary)
+                                .repSecondaryText()
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .padding(16)
@@ -58,7 +58,7 @@ struct WorkoutHistoryDetailView: View {
             VStack(alignment: .leading, spacing: 5) {
                 Text(session.completedAt ?? session.startedAt, format: .dateTime.weekday(.wide).month(.wide).day().year())
                     .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .repSecondaryText()
                 Text(session.name)
                     .font(.largeTitle.bold())
                     .lineLimit(2)
@@ -100,7 +100,7 @@ private struct HistoricalSummaryMetric: View {
                 .lineLimit(1)
             Text(title)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .repSecondaryText()
         }
         .frame(maxWidth: .infinity, minHeight: 86, alignment: .leading)
         .padding(14)
@@ -127,7 +127,7 @@ private struct HistoricalExerciseCard: View {
                 Spacer()
                 Text("\(completedSets.count) set\(completedSets.count == 1 ? "" : "s")")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .repSecondaryText()
             }
             .padding(16)
 
@@ -136,7 +136,7 @@ private struct HistoricalExerciseCard: View {
             if completedSets.isEmpty {
                 Text("No completed sets")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .repSecondaryText()
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(16)
             } else {
@@ -155,7 +155,7 @@ private struct HistoricalExerciseCard: View {
                 Divider().padding(.leading, 16)
                 Label(workoutExercise.notes, systemImage: "note.text")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .repSecondaryText()
                     .padding(16)
             }
         }
@@ -205,7 +205,7 @@ private struct HistoricalSetRow: View {
                 if set.setType != .working {
                     Text(set.setType.displayName)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .repSecondaryText()
                 }
             }
 
@@ -214,7 +214,7 @@ private struct HistoricalSetRow: View {
             if let rpe = set.rpe {
                 Text("RPE \(rpe.formatted(.number.precision(.fractionLength(0...1))))")
                     .font(.caption.weight(.medium).monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .repSecondaryText()
             }
         }
         .accessibilityElement(children: .combine)

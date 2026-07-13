@@ -21,7 +21,7 @@ struct ExerciseCatalogStatusView: View {
                     if let progress {
                         Text(progress, format: .percent.precision(.fractionLength(0)))
                             .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
+                            .repSecondaryText()
                     }
                 }
                 if let progress {
@@ -42,7 +42,7 @@ struct ExerciseCatalogStatusView: View {
                         .font(.caption.weight(.semibold))
                     Text(errorMessage)
                         .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .repSecondaryText()
                         .lineLimit(2)
                 }
                 Spacer()
@@ -78,7 +78,7 @@ struct ExercisePickerRow: View {
                             .lineLimit(2)
                         Text("\(exercise.primaryMuscleGroup.displayName) · \(exercise.equipment.displayName)")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .repSecondaryText()
                             .lineLimit(1)
                     }
 
@@ -323,17 +323,7 @@ struct ExerciseDetailView: View {
     }
 
     private var instructionSteps: [String] {
-        exercise.instructions
-            .components(separatedBy: .newlines)
-            .map {
-                $0.trimmingCharacters(in: .whitespacesAndNewlines)
-                    .replacingOccurrences(
-                        of: #"^\s*(?:\d+[.)]|[-•])\s*"#,
-                        with: "",
-                        options: .regularExpression
-                    )
-            }
-            .filter { !$0.isEmpty }
+        ExerciseInstructionFormatter.steps(from: exercise.instructions)
     }
 
     var body: some View {
@@ -358,7 +348,7 @@ struct ExerciseDetailView: View {
                             }
                         }
                         .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.secondary)
+                        .repSecondaryText()
                     }
 
                     instructions
@@ -370,7 +360,7 @@ struct ExerciseDetailView: View {
                                 VStack(alignment: .leading, spacing: 1) {
                                     Text("Exercise source")
                                         .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                        .repSecondaryText()
                                     Text(exercise.sourceName ?? "View original")
                                         .font(.subheadline.weight(.semibold))
                                 }
@@ -434,14 +424,14 @@ struct ExerciseDetailView: View {
                         .controlSize(.large)
                     Text("Loading movement reference…")
                         .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.secondary)
+                        .repSecondaryText()
                 } else {
                     Image(systemName: "figure.strengthtraining.traditional")
                         .font(.system(size: 42, weight: .medium))
                         .foregroundStyle(.tint)
                     Text(referenceError ?? "Movement reference coming soon")
                         .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.secondary)
+                        .repSecondaryText()
                         .multilineTextAlignment(.center)
                     if referenceError != nil {
                         Button("Try Again") {
@@ -479,33 +469,58 @@ struct ExerciseDetailView: View {
 
     @ViewBuilder
     private var instructions: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("How to perform")
-                .font(.title3.bold())
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("How to perform")
+                    .font(.title3.bold())
+
+                if !instructionSteps.isEmpty {
+                    Text("\(instructionSteps.count) steps")
+                        .font(.subheadline)
+                        .repSecondaryText()
+                }
+            }
 
             if instructionSteps.isEmpty {
                 Text("Form guidance is not available for this exercise yet.")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .repSecondaryText()
             } else {
-                ForEach(Array(instructionSteps.enumerated()), id: \.offset) { index, step in
-                    HStack(alignment: .top, spacing: 12) {
-                        Text("\(index + 1)")
-                            .font(.caption.bold().monospacedDigit())
-                            .foregroundStyle(.white)
-                            .frame(width: 26, height: 26)
-                            .background(Color.accentColor, in: Circle())
-                            .accessibilityHidden(true)
-                        Text(step)
-                            .font(.body)
-                            .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(instructionSteps.enumerated()), id: \.offset) { index, step in
+                        HStack(alignment: .top, spacing: 14) {
+                            Button {
+                                ExerciseStepSpeechService.shared.speakStep(number: index + 1, text: step)
+                            } label: {
+                                Text("\(index + 1)")
+                                    .font(.caption.bold().monospacedDigit())
+                                    .foregroundStyle(.white)
+                                    .frame(width: 28, height: 28)
+                                    .background(Color.accentColor, in: Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Speak step \(index + 1)")
+
+                            Text(step)
+                                .font(.body)
+                                .foregroundStyle(.primary)
+                                .lineSpacing(4)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .padding(.vertical, 12)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityLabel("Step \(index + 1), \(step)")
+
+                        if index < instructionSteps.count - 1 {
+                            Divider()
+                                .padding(.leading, 42)
+                        }
                     }
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("Step \(index + 1), \(step)")
                 }
             }
 
-            Text("Use this as a movement reference. Setup and technique can vary based on your body, equipment, and goals.")
+            Text("Use this as a general form guide. Adjust setup and technique for your body, equipment, and goals.")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .fixedSize(horizontal: false, vertical: true)

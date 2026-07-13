@@ -142,7 +142,7 @@ struct BodyweightProgressView: View {
                         .font(.headline)
                     Text("Entries in the selected range")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .repSecondaryText()
                 }
 
                 Spacer()
@@ -233,7 +233,7 @@ struct BodyweightProgressView: View {
                             if !entry.notes.isEmpty {
                                 Text(entry.notes)
                                     .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    .repSecondaryText()
                                     .lineLimit(1)
                             }
                         }
@@ -300,7 +300,7 @@ private struct BodyweightMetricCard: View {
                 .lineLimit(1)
             Text(title)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .repSecondaryText()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(minHeight: 106)
@@ -347,7 +347,7 @@ private struct BodyweightEntryEditor: View {
                             .font(.title2.monospacedDigit())
                             .accessibilityLabel("Bodyweight in \(preferredUnit.displayName.lowercased())")
                         Text(preferredUnit.symbol)
-                            .foregroundStyle(.secondary)
+                            .repSecondaryText()
                     }
 
                     DatePicker("Measured", selection: $measuredAt, in: ...Date())

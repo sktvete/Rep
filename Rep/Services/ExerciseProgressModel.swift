@@ -144,21 +144,29 @@ final class ExerciseProgressModel {
         return availableExercises.first?.id
     }
 
-    private static func availableExercises(in sessions: [WorkoutSession]) -> [Exercise] {
-        var seen = Set<UUID>()
-        var exercises: [Exercise] = []
-        exercises.reserveCapacity(32)
+    static func availableExercises(in sessions: [WorkoutSession]) -> [Exercise] {
+        var exercisesByID: [UUID: Exercise] = [:]
+        var usageCounts: [UUID: Int] = [:]
+        exercisesByID.reserveCapacity(32)
+        usageCounts.reserveCapacity(32)
 
         for session in sessions {
             for workoutExercise in session.exercises {
                 guard let exercise = workoutExercise.exercise,
-                      seen.insert(exercise.id).inserted else { continue }
-                exercises.append(exercise)
+                      workoutExercise.sets.contains(where: \.isCompleted) else { continue }
+                exercisesByID[exercise.id] = exercise
+                usageCounts[exercise.id, default: 0] += 1
             }
         }
 
-        return exercises.sorted {
-            $0.name.localizedStandardCompare($1.name) == .orderedAscending
+        return exercisesByID.values.sorted {
+            let leftUsage = usageCounts[$0.id, default: 0]
+            let rightUsage = usageCounts[$1.id, default: 0]
+            if leftUsage != rightUsage { return leftUsage > rightUsage }
+
+            let nameOrder = $0.name.localizedStandardCompare($1.name)
+            if nameOrder != .orderedSame { return nameOrder == .orderedAscending }
+            return $0.id.uuidString < $1.id.uuidString
         }
     }
 

@@ -2,10 +2,14 @@ import SwiftData
 import SwiftUI
 
 struct HistoryView: View {
+    @Environment(\.modelContext) private var modelContext
+
     @Query(sort: \WorkoutSession.startedAt, order: .reverse)
     private var sessions: [WorkoutSession]
 
     @Query private var settings: [UserSettings]
+
+    @State private var errorMessage: String?
 
     private var preferredUnit: WeightUnit {
         settings.first?.preferredWeightUnit ?? .kilograms
@@ -59,11 +63,16 @@ struct HistoryView: View {
                                     .listRowBackground(Color.clear)
                                     .listRowSeparator(.hidden)
                                     .accessibilityHint("Shows exercises and completed sets")
+                                    .contextMenu {
+                                        Button("Delete workout", systemImage: "trash", role: .destructive) {
+                                            delete(session)
+                                        }
+                                    }
                                 }
                             } header: {
                                 Text(group.date, format: .dateTime.weekday(.wide).month(.wide).day())
                                     .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(.secondary)
+                                    .repSecondaryText()
                                     .textCase(nil)
                                     .padding(.top, 8)
                             }
@@ -76,11 +85,29 @@ struct HistoryView: View {
                 }
             }
             .navigationTitle("History")
+            .alert("Couldn’t delete the workout", isPresented: Binding(
+                get: { errorMessage != nil },
+                set: { if !$0 { errorMessage = nil } }
+            )) {
+                Button("OK", role: .cancel) { errorMessage = nil }
+            } message: {
+                Text(errorMessage ?? "Please try again.")
+            }
         }
     }
 
     private func sessionDate(_ session: WorkoutSession) -> Date {
         session.completedAt ?? session.startedAt
+    }
+
+    private func delete(_ session: WorkoutSession) {
+        modelContext.delete(session)
+        do {
+            try modelContext.save()
+        } catch {
+            AppLog.persistenceFailure(operation: "Delete workout from history", error: error)
+            errorMessage = error.localizedDescription
+        }
     }
 }
 
@@ -124,7 +151,7 @@ private struct HistoryOverviewMetric: View {
                 .labelStyle(.titleAndIcon)
             Text(label)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .repSecondaryText()
         }
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .combine)
@@ -165,7 +192,7 @@ private struct WorkoutHistoryRow: View {
                         .lineLimit(2)
                     Text(session.completedAt ?? session.startedAt, format: .dateTime.hour().minute())
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .repSecondaryText()
                 }
 
                 Spacer(minLength: 8)
@@ -186,7 +213,7 @@ private struct WorkoutHistoryRow: View {
                 let displayedVolume = UnitConversion.weight(applicableVolume, from: .kilograms, to: preferredUnit)
                 Text("\(displayedVolume.formatted(.number.precision(.fractionLength(0)))) \(preferredUnit.symbol) volume")
                     .font(.caption.weight(.medium).monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .repSecondaryText()
             }
         }
         .padding(16)
@@ -203,7 +230,7 @@ private struct HistoryRowMetric: View {
     var body: some View {
         Label(value, systemImage: systemImage)
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .repSecondaryText()
             .lineLimit(1)
             .minimumScaleFactor(0.8)
     }

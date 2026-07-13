@@ -176,6 +176,36 @@ struct ProgressCalculatorTests {
         #expect(chartPoints[0].estimatedOneRepMax == 110)
     }
 
+    @Test("Progress exercises are limited to completed work and ordered by usage")
+    @MainActor
+    func progressExerciseOrdering() {
+        let bench = Exercise(name: "Bench Press", primaryMuscleGroup: .chest, equipment: .barbell)
+        let row = Exercise(name: "Cable Row", primaryMuscleGroup: .back, equipment: .cable)
+        let squat = Exercise(name: "Squat", primaryMuscleGroup: .quadriceps, equipment: .barbell)
+        let routine = TestFixtures.routine("Training")
+
+        func worked(_ exercise: Exercise) -> WorkoutExercise {
+            WorkoutExercise(exercise: exercise, sets: [WorkoutSet(isCompleted: true)])
+        }
+
+        let sessions = [
+            TestFixtures.completedSession(
+                routine: routine,
+                at: TestFixtures.date("2026-05-01"),
+                exercises: [worked(bench), worked(row)]
+            ),
+            TestFixtures.completedSession(
+                routine: routine,
+                at: TestFixtures.date("2026-06-01"),
+                exercises: [worked(bench), WorkoutExercise(exercise: squat, sets: [WorkoutSet()])]
+            )
+        ]
+
+        let exercises = ExerciseProgressModel.availableExercises(in: sessions)
+
+        #expect(exercises.map(\.id) == [bench.id, row.id])
+    }
+
     @Test("Nice Y domain pads and rounds chart bounds")
     func niceYDomain() {
         let domain = ProgressChartScale.niceYDomain(for: [82, 88, 95], minimumPadding: 2.5)

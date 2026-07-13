@@ -126,4 +126,25 @@ struct ExerciseSearchEngineTests {
         #expect(results.first?.name == "Back Squat")
         #expect(results.map(\.name).last == "Squat Jerk")
     }
+
+    @Test("Singular/plural query variants still rank the canonical exercise first")
+    func tricepsPushdownSingularVariant() {
+        let list = [
+            Exercise(
+                name: "Triceps Pushdown",
+                primaryMuscleGroup: .triceps,
+                equipment: .cable,
+                searchAliases: ["Tricep Pushdown"],
+                popularityRank: ExercisePopularity.rank(for: "Triceps Pushdown")
+            ),
+            Exercise(
+                name: "Triceps Pushdown (Rope)",
+                primaryMuscleGroup: .triceps,
+                equipment: .cable
+            ),
+        ]
+
+        let results = ExerciseSearchEngine.search(list, query: "Tricep Pushdown")
+        #expect(results.first?.name == "Triceps Pushdown")
+    }
 }

@@ -1,0 +1,32 @@
+[
+  {
+    "slug": "barbell-bench-press",
+    "name": "Barbell Bench Press",
+    "exerciseId": "EIeI8Vf",
+    "gifUrl": "https://static.exercisedb.dev/media/EIeI8Vf.gif"
+  },
+  {
+    "slug": "dip",
+    "name": "Dip",
+    "exerciseId": "9WTm7dq",
+    "gifUrl": "https://static.exercisedb.dev/media/9WTm7dq.gif"
+  },
+  {
+    "slug": "triceps-pushdown",
+    "name": "Triceps Pushdown",
+    "exerciseId": "gAwDzB3",
+    "gifUrl": "https://static.exercisedb.dev/media/gAwDzB3.gif"
+  },
+  {
+    "slug": "pull-up",
+    "name": "Pull-Up",
+    "exerciseId": "lBDjFxJ",
+    "gifUrl": "https://static.exercisedb.dev/media/lBDjFxJ.gif"
+  },
+  {
+    "slug": "barbell-squat",
+    "name": "Barbell Full Squat",
+    "exerciseId": "qXTaZnJ",
+    "gifUrl": "https://static.exercisedb.dev/media/qXTaZnJ.gif"
+  }
+]

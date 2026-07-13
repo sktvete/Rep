@@ -1,0 +1,12 @@
+DerivedData/
+.DS_Store
+*.xcuserstate
+xcuserdata/
+build/
+
+scripts/exercise-media/backups/
+scripts/exercise-media/working/
+scripts/exercise-media/output/
+scripts/exercise-media/benchmark/
+scripts/tools/
+

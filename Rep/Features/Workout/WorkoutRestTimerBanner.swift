@@ -20,7 +20,7 @@ struct WorkoutRestTimerBanner: View {
                     if restTimer.isPaused {
                         Text("Paused")
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
+                            .repSecondaryText()
                             .padding(.horizontal, 8)
                             .padding(.vertical, 3)
                             .background(Color(.tertiarySystemFill), in: Capsule())
@@ -29,7 +29,7 @@ struct WorkoutRestTimerBanner: View {
 
                 Text(restTimer.nextExerciseName)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .repSecondaryText()
                     .lineLimit(1)
             }
 

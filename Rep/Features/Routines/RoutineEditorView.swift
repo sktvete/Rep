@@ -11,6 +11,7 @@ struct RoutineEditorView: View {
     @State private var routinePendingDeletion = false
     @State private var operationError: String?
     @State private var catalogService = ExerciseDBCatalogService()
+    @State private var debouncedSaveTask: Task<Void, Never>?
 
     private let onStartRoutine: () -> Void
 
@@ -25,21 +26,28 @@ struct RoutineEditorView: View {
 
     var body: some View {
         List {
-            Section("Routine") {
-                LabeledContent {
-                    TextField("Routine name", text: $routine.name)
-                        .multilineTextAlignment(.trailing)
-                        .font(.body.weight(.medium))
-                        .submitLabel(.done)
-                        .onSubmit(keepChanges)
-                        .onChange(of: routine.name) { _, _ in keepChanges() }
-                } label: {
-                    Label("Name", systemImage: "textformat")
-                }
+            Section {
+                VStack(alignment: .leading, spacing: 0) {
+                    LabeledContent {
+                        TextField("Routine name", text: $routine.name)
+                            .multilineTextAlignment(.trailing)
+                            .font(.body.weight(.medium))
+                            .submitLabel(.done)
+                            .onSubmit(keepChanges)
+                            .onChange(of: routine.name) { _, _ in scheduleKeepChanges() }
+                    } label: {
+                        Label("Name", systemImage: "textformat")
+                    }
 
-                TextField("Notes (optional)", text: $routine.notes, axis: .vertical)
-                    .lineLimit(2...5)
-                    .onChange(of: routine.notes) { _, _ in keepChanges() }
+                    Divider().padding(.vertical, 12)
+
+                    TextField("Notes (optional)", text: $routine.notes, axis: .vertical)
+                        .lineLimit(2...5)
+                        .onChange(of: routine.notes) { _, _ in scheduleKeepChanges() }
+                }
+                .repThemedListSection()
+            } header: {
+                RepSectionHeader(title: "Routine")
             }
 
             Section {
@@ -49,6 +57,8 @@ struct RoutineEditorView: View {
                         systemImage: "dumbbell",
                         description: Text("Add an exercise to shape this routine.")
                     )
+                    .frame(maxWidth: .infinity)
+                    .repThemedListSection(padding: 24)
                 } else {
                     ForEach(orderedExercises) { item in
                         Button {
@@ -58,6 +68,7 @@ struct RoutineEditorView: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityHint("Opens set, repetition, and rest settings")
+                        .repThemedListRow()
                     }
                     .onDelete(perform: removeExercises)
                     .onMove(perform: moveExercises)
@@ -68,9 +79,10 @@ struct RoutineEditorView: View {
                 } label: {
                     Label("Add Exercise", systemImage: "plus.circle.fill")
                 }
+                .repThemedListRow()
             } header: {
                 HStack {
-                    Text("Exercises")
+                    RepSectionHeader(title: "Exercises")
                     Spacer()
                     if orderedExercises.count > 1 {
                         EditButton()
@@ -88,12 +100,17 @@ struct RoutineEditorView: View {
                 Button("Delete Routine", systemImage: "trash", role: .destructive) {
                     routinePendingDeletion = true
                 }
+                .repThemedListRow()
             }
         }
-        .scrollContentBackground(.hidden)
+        .repThemedList()
         .background(RepScreenBackground())
         .navigationTitle(routine.name.isEmpty ? "Routine" : routine.name)
         .navigationBarTitleDisplayMode(.inline)
+        .onDisappear {
+            debouncedSaveTask?.cancel()
+            keepChanges()
+        }
         .safeAreaInset(edge: .bottom) {
             if !routine.isArchived {
                 Button(action: onStartRoutine) {
@@ -185,6 +202,15 @@ struct RoutineEditorView: View {
         keepChanges()
     }
 
+    private func scheduleKeepChanges() {
+        debouncedSaveTask?.cancel()
+        debouncedSaveTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
+            keepChanges()
+        }
+    }
+
     private func keepChanges() {
         routine.updatedAt = .now
         do {
@@ -216,7 +242,7 @@ private struct RoutineExerciseRow: View {
                     .foregroundStyle(.primary)
                 Text("\(item.targetSetCount) sets · \(item.suggestedRepetitions) reps · \(restDescription)")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .repSecondaryText()
             }
             Spacer()
             Image(systemName: "chevron.right")
@@ -243,30 +269,43 @@ private struct RoutineExerciseConfigurationView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section(item.exercise?.name ?? "Exercise") {
-                    Stepper(value: $item.targetSetCount, in: 1...20) {
-                        LabeledContent("Target Sets", value: "\(item.targetSetCount)")
-                    }
-                    .accessibilityValue("\(item.targetSetCount) sets")
+                Section {
+                    VStack(spacing: 0) {
+                        Stepper(value: $item.targetSetCount, in: 1...20) {
+                            LabeledContent("Target Sets", value: "\(item.targetSetCount)")
+                        }
+                        .accessibilityValue("\(item.targetSetCount) sets")
 
-                    Stepper(value: $item.suggestedRepetitions, in: 1...100) {
-                        LabeledContent("Repetitions", value: "\(item.suggestedRepetitions)")
+                        Divider().padding(.vertical, 12)
+
+                        Stepper(value: $item.suggestedRepetitions, in: 1...100) {
+                            LabeledContent("Repetitions", value: "\(item.suggestedRepetitions)")
+                        }
+                        .accessibilityValue("\(item.suggestedRepetitions) repetitions")
                     }
-                    .accessibilityValue("\(item.suggestedRepetitions) repetitions")
+                    .repThemedListSection()
+                } header: {
+                    RepSectionHeader(title: item.exercise?.name ?? "Exercise")
                 }
 
-                Section("Rest") {
+                Section {
                     Stepper(value: $item.defaultRestSeconds, in: 0...900, step: 15) {
                         LabeledContent("After each set", value: duration(item.defaultRestSeconds))
                     }
+                    .repThemedListSection()
+                } header: {
+                    RepSectionHeader(title: "Rest")
                 }
 
-                Section("Notes") {
+                Section {
                     TextField("Setup, tempo, or reminder", text: $item.notes, axis: .vertical)
                         .lineLimit(2...5)
+                        .repThemedListSection()
+                } header: {
+                    RepSectionHeader(title: "Notes")
                 }
             }
-            .scrollContentBackground(.hidden)
+            .repThemedList()
             .background(RepScreenBackground())
             .navigationTitle("Exercise Setup")
             .navigationBarTitleDisplayMode(.inline)

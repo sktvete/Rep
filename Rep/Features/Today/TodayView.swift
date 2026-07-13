@@ -42,16 +42,6 @@ struct TodayView: View {
         return activeRoutines.first { $0.id == suggestion.routineID }
     }
 
-    private var recentRoutines: [Routine] {
-        activeRoutines
-            .filter { $0.id != suggestedRoutine?.id }
-            .sorted {
-                ($0.lastPerformedAt ?? $0.updatedAt) > ($1.lastPerformedAt ?? $1.updatedAt)
-            }
-            .prefix(3)
-            .map { $0 }
-    }
-
     var body: some View {
         NavigationStack {
             ZStack {
@@ -60,10 +50,6 @@ struct TodayView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: RepVisualSystem.pageSpacing) {
                         primarySection
-
-                        if !recentRoutines.isEmpty {
-                            recentRoutinesSection
-                        }
 
                         WeeklyActivityCard(completedSessions: sessions.filter { $0.state == .completed })
                     }
@@ -120,57 +106,6 @@ struct TodayView: View {
         }
     }
 
-    private var recentRoutinesSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SectionTitle("Recent Routines", systemImage: "clock.arrow.circlepath")
-
-            VStack(spacing: 0) {
-                ForEach(Array(recentRoutines.enumerated()), id: \.element.id) { index, routine in
-                    Button {
-                        start(routine)
-                    } label: {
-                        HStack(spacing: 14) {
-                            Image(systemName: "figure.strengthtraining.traditional")
-                                .font(.body.weight(.semibold))
-                                .foregroundStyle(.tint)
-                                .frame(width: 36, height: 36)
-                                .background(.tint.opacity(0.1), in: .rect(cornerRadius: 11))
-                                .accessibilityHidden(true)
-
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(routine.name)
-                                    .font(.body.weight(.semibold))
-                                    .foregroundStyle(.primary)
-                                Text(routineSummary(routine))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
-                            Spacer(minLength: 8)
-                            Image(systemName: "play.fill")
-                                .font(.caption.weight(.bold))
-                                .foregroundStyle(.tint)
-                                .frame(width: 32, height: 32)
-                                .background(.tint.opacity(0.1), in: Circle())
-                                .accessibilityHidden(true)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Start \(routine.name)")
-                    .accessibilityHint(routineSummary(routine))
-
-                    if index < recentRoutines.count - 1 {
-                        Divider().padding(.leading, 66)
-                    }
-                }
-            }
-            .repSurface()
-        }
-    }
-
     private func start(_ routine: Routine) {
         do {
             let session = try WorkoutService(context: modelContext).startWorkout(from: routine)
@@ -213,10 +148,6 @@ struct TodayView: View {
         }
     }
 
-    private func routineSummary(_ routine: Routine) -> String {
-        let names = routine.orderedExercises.prefix(3).compactMap { $0.exercise?.name }
-        return names.isEmpty ? "No exercises" : names.joined(separator: " · ")
-    }
 }
 
 private struct ActiveWorkoutCard: View {
@@ -240,7 +171,7 @@ private struct ActiveWorkoutCard: View {
                     .contentTransition(.numericText())
             }
             .font(.subheadline)
-            .foregroundStyle(.secondary)
+            .repSecondaryText()
 
             Button(action: onContinue) {
                 Text("Continue Workout")
@@ -290,7 +221,7 @@ private struct StartWorkoutCard: View {
                     ? "Choose a routine, or start with a blank workout."
                     : "Create a routine for a quicker start next time, or begin with a blank workout."
             )
-            .foregroundStyle(.secondary)
+            .repSecondaryText()
 
             if let suggestedRoutine, let onStartSuggested {
                 HStack(spacing: 10) {
@@ -424,7 +355,7 @@ private struct ActivityMetric: View {
                     .monospacedDigit()
                     .contentTransition(.numericText())
             }
-            Text(label).font(.caption).foregroundStyle(.secondary)
+            Text(label).font(.caption).repSecondaryText()
         }
         .frame(maxWidth: .infinity)
     }
@@ -451,16 +382,20 @@ private struct RoutineStartPicker: View {
                         } label: {
                             HStack {
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text(routine.name).foregroundStyle(.primary)
+                                    Text(routine.name)
                                     Text("\(routine.exercises.count) exercises")
                                         .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                        .repSecondaryText()
                                 }
                                 Spacer()
-                                Image(systemName: "play.fill").font(.caption)
+                                Image(systemName: "play.fill")
+                                    .font(.caption)
+                                    .repSecondaryText()
                             }
+                            .foregroundStyle(.primary)
                             .contentShape(Rectangle())
                         }
+                        .buttonStyle(.plain)
                         .accessibilityHint("\(routine.exercises.count) exercises")
                     }
                     .listStyle(.insetGrouped)

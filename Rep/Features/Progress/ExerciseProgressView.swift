@@ -11,8 +11,12 @@ struct ExerciseProgressView: View {
 
     @Query private var settings: [UserSettings]
 
+    @Query(sort: \BodyweightEntry.measuredAt)
+    private var bodyweightEntries: [BodyweightEntry]
+
     @State private var selectedExerciseID: UUID?
     @State private var timeRange: ProgressTimeRange = .ninetyDays
+    @State private var comparison: ExerciseProgressComparison = .none
     @State private var model = ExerciseProgressModel()
 
     private var preferredUnit: WeightUnit {
@@ -22,6 +26,36 @@ struct ExerciseProgressView: View {
     private var selectedExercise: Exercise? {
         guard let id = model.resolvedSelection(for: selectedExerciseID) else { return nil }
         return model.availableExercises.first { $0.id == id }
+    }
+
+    private var comparisonPoints: [ExerciseProgressComparisonPoint] {
+        switch comparison {
+        case .none:
+            return []
+        case .bodyweight:
+            return bodyweightEntries
+                .filter { timeRange.includes($0.measuredAt) }
+                .map {
+                    ExerciseProgressComparisonPoint(
+                        id: $0.id,
+                        date: $0.measuredAt,
+                        value: displayWeight($0.weightKilograms)
+                    )
+                }
+        case .sessionLength:
+            guard let exerciseID = model.resolvedSelection(for: selectedExerciseID) else { return [] }
+            return completedSessions.compactMap { session in
+                let date = session.completedAt ?? session.startedAt
+                let includesExercise = session.exercises.contains { workoutExercise in
+                    workoutExercise.exercise?.id == exerciseID
+                        && workoutExercise.sets.contains(where: \.isCompleted)
+                }
+                guard includesExercise, timeRange.includes(date) else { return nil }
+                let minutes = session.duration(at: date) / 60
+                guard minutes > 0 else { return nil }
+                return ExerciseProgressComparisonPoint(id: session.id, date: date, value: minutes)
+            }
+        }
     }
 
     private var rebuildSignature: String {
@@ -101,7 +135,7 @@ struct ExerciseProgressView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Exercise")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .repSecondaryText()
                     Text(selectedExercise?.name ?? "Choose exercise")
                         .font(.headline)
                         .foregroundStyle(.primary)
@@ -109,7 +143,7 @@ struct ExerciseProgressView: View {
                 Spacer()
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .repSecondaryText()
             }
             .padding(16)
             .repSurface(cornerRadius: RepVisualSystem.controlRadius)
@@ -135,7 +169,7 @@ struct ExerciseProgressView: View {
                         .font(.headline)
                     Text("Best set per day")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .repSecondaryText()
                 }
 
                 Spacer()
@@ -146,61 +180,227 @@ struct ExerciseProgressView: View {
                         .foregroundStyle(RepVisualSystem.tint)
                 }
             }
+
+            comparisonSelector
+
             if model.points.contains(where: { $0.estimatedOneRepMax != nil }) {
-                let yValues = model.points.compactMap(\.estimatedOneRepMax).map(displayWeight)
-                let yDomain = ProgressChartScale.niceYDomain(
-                    for: yValues,
-                    minimumPadding: preferredUnit == .kilograms ? 2.5 : 5
-                )
-                let yStride = yDomain.map { ProgressChartScale.axisStride(for: $0) } ?? 5
-                let dayStride = ProgressChartScale.dayStride(for: model.points.map(\.date))
+                if comparison == .none || comparisonPoints.isEmpty {
+                    standardStrengthChart
+                } else {
+                    comparisonStrengthChart
+                }
 
-                Chart(model.points) { point in
-                    if let estimatedOneRepMax = point.estimatedOneRepMax {
-                        LineMark(
-                            x: .value("Date", point.date, unit: .minute),
-                            y: .value("Estimated 1RM", displayWeight(estimatedOneRepMax))
-                        )
-                        .interpolationMethod(.monotone)
-                        .foregroundStyle(.tint)
-
-                        if model.points.count <= 24 {
-                            PointMark(
-                                x: .value("Date", point.date, unit: .minute),
-                                y: .value("Estimated 1RM", displayWeight(estimatedOneRepMax))
-                            )
-                            .symbolSize(24)
-                            .foregroundStyle(.tint)
-                        }
-                    }
+                if comparison != .none, comparisonPoints.isEmpty {
+                    Text(comparison.emptyMessage)
+                        .font(.caption)
+                        .repSecondaryText()
                 }
-                .animation(.none, value: model.points)
-                .chartYScale(domain: yDomain ?? 0...100)
-                .chartYAxisLabel(preferredUnit.symbol)
-                .chartYAxis {
-                    AxisMarks(position: .leading, values: .stride(by: yStride)) {
-                        AxisGridLine().foregroundStyle(.secondary.opacity(0.15))
-                        AxisValueLabel()
-                    }
-                }
-                .chartXAxis {
-                    AxisMarks(values: .stride(by: .day, count: dayStride)) {
-                        AxisGridLine().foregroundStyle(.secondary.opacity(0.12))
-                        AxisValueLabel(format: .dateTime.month(.abbreviated).day())
-                    }
-                }
-                .frame(height: 184)
-                .accessibilityLabel("Estimated one repetition maximum chart")
             } else {
                 Text("Complete weighted sets with repetitions to calculate estimated 1RM.")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .repSecondaryText()
                     .frame(maxWidth: .infinity, minHeight: 120, alignment: .center)
                     .multilineTextAlignment(.center)
             }
         }
         .padding(16)
         .repSurface()
+    }
+
+    private var comparisonSelector: some View {
+        Menu {
+            Picker("Comparison", selection: $comparison) {
+                ForEach(ExerciseProgressComparison.allCases) { option in
+                    Label(option.title, systemImage: option.systemImage).tag(option)
+                }
+            }
+        } label: {
+            HStack(spacing: 7) {
+                Image(systemName: comparison.systemImage)
+                Text(comparison == .none ? "Add comparison" : comparison.title)
+                Spacer()
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption2.weight(.semibold))
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(comparison == .none ? Color.secondary : comparison.color)
+            .padding(.horizontal, 12)
+            .frame(height: 38)
+            .repGlassControl(cornerRadius: RepVisualSystem.controlRadius)
+        }
+        .accessibilityLabel("Chart comparison, \(comparison.title)")
+    }
+
+    private var standardStrengthChart: some View {
+        let yValues = model.points.compactMap(\.estimatedOneRepMax).map(displayWeight)
+        let yDomain = ProgressChartScale.niceYDomain(
+            for: yValues,
+            minimumPadding: preferredUnit == .kilograms ? 2.5 : 5
+        )
+        let yStride = yDomain.map { ProgressChartScale.axisStride(for: $0) } ?? 5
+        let dayStride = ProgressChartScale.dayStride(for: model.points.map(\.date))
+
+        return Chart(model.points) { point in
+            if let estimatedOneRepMax = point.estimatedOneRepMax {
+                LineMark(
+                    x: .value("Date", point.date, unit: .minute),
+                    y: .value("Estimated 1RM", displayWeight(estimatedOneRepMax))
+                )
+                .interpolationMethod(.monotone)
+                .foregroundStyle(.tint)
+
+                if model.points.count <= 24 {
+                    PointMark(
+                        x: .value("Date", point.date, unit: .minute),
+                        y: .value("Estimated 1RM", displayWeight(estimatedOneRepMax))
+                    )
+                    .symbolSize(24)
+                    .foregroundStyle(.tint)
+                }
+            }
+        }
+        .animation(.none, value: model.points)
+        .chartYScale(domain: yDomain ?? 0...100)
+        .chartYAxisLabel(preferredUnit.symbol)
+        .chartYAxis {
+            AxisMarks(position: .leading, values: .stride(by: yStride)) {
+                AxisGridLine().foregroundStyle(.secondary.opacity(0.15))
+                AxisValueLabel()
+            }
+        }
+        .chartXAxis {
+            AxisMarks(values: .stride(by: .day, count: dayStride)) {
+                AxisGridLine().foregroundStyle(.secondary.opacity(0.12))
+                AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+            }
+        }
+        .frame(height: 184)
+        .accessibilityLabel("Estimated one repetition maximum chart")
+    }
+
+    private var comparisonStrengthChart: some View {
+        let strengthValues = model.points.compactMap(\.estimatedOneRepMax).map(displayWeight)
+        let strengthDomain = ProgressChartScale.niceYDomain(
+            for: strengthValues,
+            minimumPadding: preferredUnit == .kilograms ? 2.5 : 5
+        ) ?? 0...100
+        let overlayDomain = ProgressChartScale.niceYDomain(
+            for: comparisonPoints.map(\.value),
+            minimumPadding: comparison.minimumPadding(for: preferredUnit)
+        ) ?? 0...100
+        let dates = model.points.map(\.date) + comparisonPoints.map(\.date)
+        let dayStride = ProgressChartScale.dayStride(for: dates)
+        let axisFractions = [0.0, 0.25, 0.5, 0.75, 1.0]
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 14) {
+                chartLegend(title: "1RM · \(preferredUnit.symbol)", color: RepVisualSystem.tint, dashed: false)
+                chartLegend(title: "\(comparison.title) · \(comparison.unit(preferredUnit: preferredUnit))", color: comparison.color, dashed: true)
+            }
+
+            Chart {
+                ForEach(model.points) { point in
+                    if let estimatedOneRepMax = point.estimatedOneRepMax {
+                        let value = displayWeight(estimatedOneRepMax)
+                        LineMark(
+                            x: .value("Date", point.date, unit: .minute),
+                            y: .value("Estimated 1RM", normalized(value, in: strengthDomain))
+                        )
+                        .interpolationMethod(.monotone)
+                        .foregroundStyle(RepVisualSystem.tint)
+
+                        if model.points.count <= 24 {
+                            PointMark(
+                                x: .value("Date", point.date, unit: .minute),
+                                y: .value("Estimated 1RM", normalized(value, in: strengthDomain))
+                            )
+                            .symbolSize(24)
+                            .foregroundStyle(RepVisualSystem.tint)
+                        }
+                    }
+                }
+
+                ForEach(comparisonPoints) { point in
+                    LineMark(
+                        x: .value("Date", point.date, unit: .minute),
+                        y: .value(comparison.title, normalized(point.value, in: overlayDomain))
+                    )
+                    .interpolationMethod(.monotone)
+                    .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 4]))
+                    .foregroundStyle(comparison.color)
+
+                    if comparisonPoints.count <= 24 {
+                        PointMark(
+                            x: .value("Date", point.date, unit: .minute),
+                            y: .value(comparison.title, normalized(point.value, in: overlayDomain))
+                        )
+                        .symbolSize(20)
+                        .foregroundStyle(comparison.color)
+                    }
+                }
+            }
+            .animation(.none, value: comparisonPoints)
+            .chartYScale(domain: 0.0...1.0)
+            .chartYAxis {
+                AxisMarks(position: .leading, values: axisFractions) { value in
+                    AxisGridLine().foregroundStyle(.secondary.opacity(0.15))
+                    if let fraction = value.as(Double.self) {
+                        AxisValueLabel {
+                            Text(axisLabel(denormalized(fraction, in: strengthDomain)))
+                                .foregroundStyle(RepVisualSystem.tint)
+                        }
+                    }
+                }
+                AxisMarks(position: .trailing, values: axisFractions) { value in
+                    if let fraction = value.as(Double.self) {
+                        AxisValueLabel {
+                            Text(axisLabel(denormalized(fraction, in: overlayDomain)))
+                                .foregroundStyle(comparison.color)
+                        }
+                    }
+                }
+            }
+            .chartXAxis {
+                AxisMarks(values: .stride(by: .day, count: dayStride)) {
+                    AxisGridLine().foregroundStyle(.secondary.opacity(0.12))
+                    AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+                }
+            }
+            .frame(height: 210)
+            .accessibilityLabel("Estimated one repetition maximum compared with \(comparison.title.lowercased())")
+        }
+    }
+
+    private func chartLegend(title: String, color: Color, dashed: Bool) -> some View {
+        HStack(spacing: 6) {
+            if dashed {
+                HStack(spacing: 2) {
+                    ForEach(0..<3, id: \.self) { _ in
+                        Capsule().fill(color).frame(width: 5, height: 2)
+                    }
+                }
+            } else {
+                Capsule()
+                    .fill(color)
+                    .frame(width: 18, height: 3)
+            }
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(color)
+        }
+    }
+
+    private func normalized(_ value: Double, in domain: ClosedRange<Double>) -> Double {
+        guard domain.upperBound > domain.lowerBound else { return 0.5 }
+        return min(max((value - domain.lowerBound) / (domain.upperBound - domain.lowerBound), 0), 1)
+    }
+
+    private func denormalized(_ fraction: Double, in domain: ClosedRange<Double>) -> Double {
+        domain.lowerBound + fraction * (domain.upperBound - domain.lowerBound)
+    }
+
+    private func axisLabel(_ value: Double) -> String {
+        value.formatted(.number.precision(.fractionLength(0...1)))
     }
 
     private var metricGrid: some View {
@@ -253,7 +453,7 @@ struct ExerciseProgressView: View {
                 Text("Last performed")
                     .font(.headline)
                 Text(latestPerformance.date, format: .dateTime.weekday(.wide).month(.abbreviated).day().hour().minute())
-                    .foregroundStyle(.secondary)
+                    .repSecondaryText()
                 HStack(spacing: 16) {
                     if let bestWeight = latestPerformance.bestWeight {
                         Label(formattedWeight(bestWeight), systemImage: "scalemass")
@@ -277,6 +477,68 @@ struct ExerciseProgressView: View {
     }
 }
 
+private enum ExerciseProgressComparison: String, CaseIterable, Identifiable {
+    case none
+    case bodyweight
+    case sessionLength
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .none: "None"
+        case .bodyweight: "Bodyweight"
+        case .sessionLength: "Session length"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .none: "chart.xyaxis.line"
+        case .bodyweight: "scalemass"
+        case .sessionLength: "clock"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .none: .secondary
+        case .bodyweight: .orange
+        case .sessionLength: .purple
+        }
+    }
+
+    var emptyMessage: String {
+        switch self {
+        case .none: ""
+        case .bodyweight: "No bodyweight entries in this date range."
+        case .sessionLength: "No matching completed sessions in this date range."
+        }
+    }
+
+    func unit(preferredUnit: WeightUnit) -> String {
+        switch self {
+        case .none: ""
+        case .bodyweight: preferredUnit.symbol
+        case .sessionLength: "min"
+        }
+    }
+
+    func minimumPadding(for preferredUnit: WeightUnit) -> Double {
+        switch self {
+        case .none: 1
+        case .bodyweight: preferredUnit == .kilograms ? 0.5 : 1
+        case .sessionLength: 5
+        }
+    }
+}
+
+private struct ExerciseProgressComparisonPoint: Identifiable, Equatable {
+    let id: UUID
+    let date: Date
+    let value: Double
+}
+
 private struct ProgressMetricCard: View {
     let title: String
     let value: String
@@ -295,7 +557,7 @@ private struct ProgressMetricCard: View {
                 .lineLimit(1)
             Text(title)
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .repSecondaryText()
         }
         .frame(maxWidth: .infinity, minHeight: 112, alignment: .leading)
         .padding(14)

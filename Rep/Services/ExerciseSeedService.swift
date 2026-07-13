@@ -82,6 +82,7 @@ enum ExerciseSeedService {
 
     private static let canonicalAliasesByNormalizedName: [String: [String]] = [
         ExerciseNameNormalizer.normalize("Back Squat"): ["Squat"],
+        ExerciseNameNormalizer.normalize("Triceps Pushdown"): ["Tricep Pushdown"],
     ]
 
     private static let seeds: [Seed] = [
@@ -110,7 +111,7 @@ enum ExerciseSeedService {
         Seed("Dumbbell Curl", .biceps, .dumbbell),
         Seed("Hammer Curl", .biceps, .dumbbell, secondary: [.back]),
         Seed("Cable Curl", .biceps, .cable),
-        Seed("Triceps Pushdown", .triceps, .cable),
+        Seed("Triceps Pushdown", .triceps, .cable, aliases: ["Tricep Pushdown"]),
         Seed("Overhead Triceps Extension", .triceps, .cable),
         Seed("Skull Crusher", .triceps, .barbell),
         Seed("Assisted Dip", .triceps, .machine, .assistedBodyweight, secondary: [.chest]),

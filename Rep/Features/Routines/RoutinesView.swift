@@ -53,6 +53,7 @@ struct RoutinesView: View {
                                         routine: routine,
                                         onStart: { onStartRoutine(routine) }
                                     )
+                                    .repThemedListRow()
                                     .swipeActions(edge: .trailing) {
                                         Button(role: .destructive) {
                                             routinePendingDeletion = routine
@@ -92,13 +93,12 @@ struct RoutinesView: View {
                                     }
                                 }
                             } header: {
-                                Text(showsArchivedRoutines ? "All Routines" : "Your Routines")
+                                RepSectionHeader(title: showsArchivedRoutines ? "All Routines" : "Your Routines")
                             } footer: {
                                 Text("Swipe a routine for archive and delete options. Touch and hold to duplicate it.")
                             }
                         }
-                        .scrollContentBackground(.hidden)
-                        .listStyle(.insetGrouped)
+                        .repThemedList()
                     }
                 }
             }
@@ -224,7 +224,7 @@ private struct RoutineListRow: View {
                             if routine.isArchived {
                                 Text("Archived")
                                     .font(.caption2.weight(.semibold))
-                                    .foregroundStyle(.secondary)
+                                    .repSecondaryText()
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 3)
                                     .background(.quaternary, in: Capsule())
@@ -232,7 +232,7 @@ private struct RoutineListRow: View {
                         }
                         Text(exerciseNames)
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .repSecondaryText()
                             .lineLimit(1)
                         Text("\(routine.exercises.count) exercise\(routine.exercises.count == 1 ? "" : "s")")
                             .font(.caption)
@@ -250,7 +250,6 @@ private struct RoutineListRow: View {
                     .accessibilityHint("Begins this routine")
             }
         }
-        .padding(.vertical, 5)
     }
 }
 

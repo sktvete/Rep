@@ -27,6 +27,7 @@ struct ActiveWorkoutView: View {
     @State private var isShowingDiscardConfirmation = false
     @State private var isShowingRemoveExerciseConfirmation = false
     @State private var errorMessage: String?
+    @State private var debouncedSaveTask: Task<Void, Never>?
 
     init(session: WorkoutSession, onClose: @escaping () -> Void = {}) {
         self.session = session
@@ -102,8 +103,12 @@ struct ActiveWorkoutView: View {
             updateRestTimerHapticsPreference()
         }
         .onChange(of: scenePhase) { _, phase in
-            guard phase == .active else { return }
-            restTimer.reconcileAfterForeground()
+            if phase == .active {
+                restTimer.reconcileAfterForeground()
+            } else {
+                debouncedSaveTask?.cancel()
+                persist()
+            }
         }
         .onChange(of: orderedExercises.map(\.id)) { _, ids in
             if !ids.contains(selectedExerciseID ?? UUID()) {
@@ -203,7 +208,7 @@ struct ActiveWorkoutView: View {
                 TimelineView(.periodic(from: .now, by: 1)) { context in
                     Text(session.duration(at: context.date).formattedWorkoutDuration)
                         .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
+                        .repSecondaryText()
                         .accessibilityLabel("Elapsed time \(session.duration(at: context.date).formattedWorkoutDuration)")
                 }
             }
@@ -280,7 +285,7 @@ struct ActiveWorkoutView: View {
                             .frame(maxWidth: .infinity, minHeight: 48)
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
+                    .repSecondaryText()
                 }
                 .padding(.horizontal)
                 .padding(.top, 10)
@@ -356,11 +361,26 @@ struct ActiveWorkoutView: View {
                 if let exercise = workoutExercise.exercise {
                     Text("\(exercise.primaryMuscleGroup.displayName) · \(exercise.equipment.displayName)")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .repSecondaryText()
                 }
             }
 
             Spacer()
+
+            if let exercise = workoutExercise.exercise {
+                Button {
+                    formReferenceExercise = exercise
+                } label: {
+                    Label("How to", systemImage: "play.rectangle")
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 44)
+                        .repGlassControl(cornerRadius: 99)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("How to perform \(exercise.name)")
+                .accessibilityHint("Opens the movement demonstration and instructions")
+            }
 
             Menu("Exercise options", systemImage: "ellipsis.circle") {
                 if let exercise = workoutExercise.exercise {
@@ -398,18 +418,18 @@ struct ActiveWorkoutView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Previous")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .repSecondaryText()
                     .textCase(.uppercase)
 
                 let completedSets = previous.exercise.orderedSets.filter(\.isCompleted)
                 if completedSets.isEmpty {
                     Text("No completed sets")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .repSecondaryText()
                 } else {
                     Text(completedSets.map(shortSetDescription).joined(separator: "  ·  "))
                         .font(.subheadline.monospacedDigit())
-                        .foregroundStyle(.secondary)
+                        .repSecondaryText()
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
@@ -445,7 +465,7 @@ struct ActiveWorkoutView: View {
                         set: set,
                         measurementType: workoutExercise.exercise?.measurementType ?? .weightAndRepetitions,
                         preferredUnit: preferredUnit,
-                        onEdit: persist,
+                        onEdit: schedulePersist,
                         onToggleCompletion: {
                             toggleCompletion(of: set, in: workoutExercise)
                             if set.isCompleted,
@@ -624,6 +644,15 @@ struct ActiveWorkoutView: View {
         }
     }
 
+    private func schedulePersist() {
+        debouncedSaveTask?.cancel()
+        debouncedSaveTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            persist()
+        }
+    }
+
     private func persist() {
         do {
             try modelContext.save()
@@ -665,7 +694,7 @@ private struct SetColumnHeader: View {
             Color.clear.frame(width: 48, height: 1)
         }
         .font(.caption.weight(.semibold))
-        .foregroundStyle(.secondary)
+        .repSecondaryText()
         .padding(.horizontal, 10)
         .padding(.vertical, 9)
         .accessibilityHidden(true)
@@ -721,11 +750,6 @@ private struct ActiveWorkoutSetRow: View {
         .swipeActions(edge: .trailing) {
             Button("Delete", systemImage: "trash", role: .destructive, action: onDelete)
         }
-        .onChange(of: set.weight) { _, _ in touchAndSave() }
-        .onChange(of: set.repetitions) { _, _ in touchAndSave() }
-        .onChange(of: set.durationSeconds) { _, _ in touchAndSave() }
-        .onChange(of: set.distance) { _, _ in touchAndSave() }
-        .onChange(of: set.assistanceWeight) { _, _ in touchAndSave() }
         .onChange(of: set.setTypeRaw) { _, _ in touchAndSave() }
         .contextMenu {
             Button("Delete set", systemImage: "trash", role: .destructive, action: onDelete)
@@ -736,21 +760,21 @@ private struct ActiveWorkoutSetRow: View {
     private var metricFields: some View {
         switch measurementType {
         case .weightAndRepetitions, .bodyweightPlusAddedWeight, .custom:
-            OptionalWeightField(title: "Weight", kilograms: $set.weight, preferredUnit: preferredUnit)
-            OptionalIntField(title: "Repetitions", value: $set.repetitions)
+            OptionalWeightField(title: "Weight", kilograms: $set.weight, preferredUnit: preferredUnit, onCommit: touchAndSave)
+            OptionalIntField(title: "Repetitions", value: $set.repetitions, onCommit: touchAndSave)
         case .repetitionsOnly, .bodyweightAndRepetitions:
-            OptionalIntField(title: "Repetitions", value: $set.repetitions)
+            OptionalIntField(title: "Repetitions", value: $set.repetitions, onCommit: touchAndSave)
         case .duration:
-            OptionalIntField(title: "Duration in seconds", value: $set.durationSeconds)
+            OptionalIntField(title: "Duration in seconds", value: $set.durationSeconds, onCommit: touchAndSave)
         case .weightAndDuration:
-            OptionalWeightField(title: "Weight", kilograms: $set.weight, preferredUnit: preferredUnit)
-            OptionalIntField(title: "Duration in seconds", value: $set.durationSeconds)
+            OptionalWeightField(title: "Weight", kilograms: $set.weight, preferredUnit: preferredUnit, onCommit: touchAndSave)
+            OptionalIntField(title: "Duration in seconds", value: $set.durationSeconds, onCommit: touchAndSave)
         case .distanceAndDuration:
-            OptionalDoubleField(title: "Distance in meters", value: $set.distance)
-            OptionalIntField(title: "Duration in seconds", value: $set.durationSeconds)
+            OptionalDoubleField(title: "Distance in meters", value: $set.distance, onCommit: touchAndSave)
+            OptionalIntField(title: "Duration in seconds", value: $set.durationSeconds, onCommit: touchAndSave)
         case .assistedBodyweight:
-            OptionalWeightField(title: "Assistance weight", kilograms: $set.assistanceWeight, preferredUnit: preferredUnit)
-            OptionalIntField(title: "Repetitions", value: $set.repetitions)
+            OptionalWeightField(title: "Assistance weight", kilograms: $set.assistanceWeight, preferredUnit: preferredUnit, onCommit: touchAndSave)
+            OptionalIntField(title: "Repetitions", value: $set.repetitions, onCommit: touchAndSave)
         }
     }
 
@@ -763,15 +787,61 @@ private struct ActiveWorkoutSetRow: View {
 private struct OptionalDoubleField: View {
     let title: String
     @Binding var value: Double?
+    let onCommit: () -> Void
+
+    @FocusState private var isFocused: Bool
+    @State private var text: String = ""
 
     var body: some View {
-        TextField("—", value: $value, format: .number.precision(.fractionLength(0...2)))
+        TextField("—", text: $text)
             .keyboardType(.decimalPad)
             .multilineTextAlignment(.center)
             .font(.body.monospacedDigit().weight(.medium))
             .frame(maxWidth: .infinity, minHeight: 44)
             .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 9))
             .accessibilityLabel(title)
+            .focused($isFocused)
+            .onAppear { syncFromValue() }
+            .onChange(of: value) { _, _ in
+                guard !isFocused else { return }
+                syncFromValue()
+            }
+            .onChange(of: isFocused) { _, focused in
+                if !focused { commit() }
+            }
+    }
+
+    private func syncFromValue() {
+        if let value {
+            text = value.formatted(.number.precision(.fractionLength(0...2)))
+        } else {
+            text = ""
+        }
+    }
+
+    private func commit() {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            if value != nil {
+                value = nil
+                onCommit()
+            }
+            return
+        }
+
+        let formatter = NumberFormatter()
+        formatter.locale = .current
+        formatter.numberStyle = .decimal
+        let number = formatter.number(from: trimmed) ?? Double(trimmed.replacingOccurrences(of: ",", with: ".")) as NSNumber?
+        guard let parsed = number?.doubleValue, parsed.isFinite else {
+            syncFromValue()
+            return
+        }
+
+        if value != parsed {
+            value = parsed
+            onCommit()
+        }
     }
 }
 
@@ -779,29 +849,31 @@ private struct OptionalWeightField: View {
     let title: String
     @Binding var kilograms: Double?
     let preferredUnit: WeightUnit
+    let onCommit: () -> Void
 
     private var weightStep: Double { 5 }
 
-    private var displayedValue: Binding<Double?> {
-        Binding(
-            get: {
-                kilograms.map { UnitConversion.weight($0, from: .kilograms, to: preferredUnit) }
-            },
-            set: { newValue in
-                kilograms = newValue.map { UnitConversion.weight($0, from: preferredUnit, to: .kilograms) }
-            }
-        )
-    }
+    @FocusState private var isFocused: Bool
+    @State private var text: String = ""
 
     var body: some View {
         ZStack {
-            TextField("—", value: displayedValue, format: .number.precision(.fractionLength(0...2)))
+            TextField("—", text: $text)
                 .keyboardType(.decimalPad)
                 .multilineTextAlignment(.center)
                 .font(.body.monospacedDigit().weight(.medium))
                 .padding(.horizontal, 34)
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .accessibilityLabel("\(title) in \(preferredUnit.displayName.lowercased())")
+                .focused($isFocused)
+                .onAppear { syncFromValue() }
+                .onChange(of: kilograms) { _, _ in
+                    guard !isFocused else { return }
+                    syncFromValue()
+                }
+                .onChange(of: isFocused) { _, focused in
+                    if !focused { commit() }
+                }
 
             HStack(spacing: 0) {
                 RepeatStepButton(systemImage: "minus", accessibilityLabel: "Decrease \(title.lowercased())") {
@@ -817,30 +889,86 @@ private struct OptionalWeightField: View {
     }
 
     private func adjustWeight(by displayDelta: Double) {
-        let currentDisplay = kilograms.map { UnitConversion.weight($0, from: .kilograms, to: preferredUnit) } ?? 0
+        let currentDisplay = currentDisplayValue
         let newDisplay = max(0, currentDisplay + displayDelta)
         guard newDisplay > 0 else {
             kilograms = nil
+            syncFromValue()
+            onCommit()
             return
         }
         kilograms = UnitConversion.weight(newDisplay, from: preferredUnit, to: .kilograms)
+        syncFromValue()
+        onCommit()
+    }
+
+    private var currentDisplayValue: Double {
+        kilograms.map { UnitConversion.weight($0, from: .kilograms, to: preferredUnit) } ?? 0
+    }
+
+    private func syncFromValue() {
+        if let kilograms {
+            let display = UnitConversion.weight(kilograms, from: .kilograms, to: preferredUnit)
+            text = display.formatted(.number.precision(.fractionLength(0...2)))
+        } else {
+            text = ""
+        }
+    }
+
+    private func commit() {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            if kilograms != nil {
+                kilograms = nil
+                onCommit()
+            }
+            return
+        }
+
+        let formatter = NumberFormatter()
+        formatter.locale = .current
+        formatter.numberStyle = .decimal
+        let number = formatter.number(from: trimmed) ?? Double(trimmed.replacingOccurrences(of: ",", with: ".")) as NSNumber?
+        guard let parsedDisplay = number?.doubleValue, parsedDisplay.isFinite else {
+            syncFromValue()
+            return
+        }
+
+        let newKilograms = UnitConversion.weight(parsedDisplay, from: preferredUnit, to: .kilograms)
+        if kilograms != newKilograms {
+            kilograms = newKilograms
+            onCommit()
+        }
     }
 }
 
 private struct OptionalIntField: View {
     let title: String
     @Binding var value: Int?
+    let onCommit: () -> Void
     var step: Int = 1
+
+    @FocusState private var isFocused: Bool
+    @State private var text: String = ""
 
     var body: some View {
         ZStack {
-            TextField("—", value: $value, format: .number)
+            TextField("—", text: $text)
                 .keyboardType(.numberPad)
                 .multilineTextAlignment(.center)
                 .font(.body.monospacedDigit().weight(.medium))
                 .padding(.horizontal, 34)
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .accessibilityLabel(title)
+                .focused($isFocused)
+                .onAppear { syncFromValue() }
+                .onChange(of: value) { _, _ in
+                    guard !isFocused else { return }
+                    syncFromValue()
+                }
+                .onChange(of: isFocused) { _, focused in
+                    if !focused { commit() }
+                }
 
             HStack(spacing: 0) {
                 RepeatStepButton(systemImage: "minus", accessibilityLabel: "Decrease \(title.lowercased())") {
@@ -856,9 +984,46 @@ private struct OptionalIntField: View {
     }
 
     private func adjust(by delta: Int) {
-        let current = value ?? 0
+        let current = Int(text) ?? (value ?? 0)
         let updated = max(0, current + delta)
-        value = updated == 0 ? nil : updated
+        if updated == 0 {
+            value = nil
+            text = ""
+        } else {
+            value = updated
+            text = "\(updated)"
+        }
+        onCommit()
+    }
+
+    private func syncFromValue() {
+        if let value {
+            text = "\(value)"
+        } else {
+            text = ""
+        }
+    }
+
+    private func commit() {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            if value != nil {
+                value = nil
+                onCommit()
+            }
+            return
+        }
+
+        guard let parsed = Int(trimmed), parsed >= 0 else {
+            syncFromValue()
+            return
+        }
+
+        let newValue = parsed == 0 ? nil : parsed
+        if value != newValue {
+            value = newValue
+            onCommit()
+        }
     }
 }
 

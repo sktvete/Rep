@@ -128,6 +128,20 @@ enum WeightUnit: String, Codable, CaseIterable, Identifiable, Sendable, DisplayN
     var displayName: String { self == .kilograms ? "Kilograms" : "Pounds" }
 }
 
+enum AppAppearance: String, Codable, CaseIterable, Identifiable, Sendable, DisplayNamed {
+    case system, light, dark
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .system: "System"
+        case .light: "Light"
+        case .dark: "Dark"
+        }
+    }
+}
+
 enum ProgressTimeRange: String, Codable, CaseIterable, Identifiable, Sendable, DisplayNamed {
     case thirtyDays, ninetyDays, sixMonths, oneYear, allTime
     var id: String { rawValue }

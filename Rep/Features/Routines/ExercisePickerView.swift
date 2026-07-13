@@ -47,19 +47,19 @@ struct ExercisePickerView: View {
                                 onSelect: { onSelect(exercise) },
                                 onShowDetails: { detailExercise = exercise }
                             )
+                            .repThemedListRow(padding: 12)
                         }
 
                         if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                            exercises.count > searchModel.displayed.count {
                             Text("Type to search \(exercises.count) exercises")
                                 .font(.footnote)
-                                .foregroundStyle(.secondary)
+                                .repSecondaryText()
                                 .frame(maxWidth: .infinity, alignment: .center)
                                 .listRowBackground(Color.clear)
                         }
                     }
-                    .listStyle(.insetGrouped)
-                    .scrollContentBackground(.hidden)
+                    .repThemedList()
                 }
             }
             .background(RepScreenBackground())

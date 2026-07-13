@@ -1,30 +1,23 @@
 import SwiftUI
 
 enum RepVisualSystem {
-    static let tint = Color(red: 0.12, green: 0.43, blue: 0.96)
+    static let tint = Color.accentColor
     static let cardRadius: CGFloat = 22
     static let controlRadius: CGFloat = 16
     static let pageSpacing: CGFloat = 20
 }
 
 struct RepScreenBackground: View {
-    var body: some View {
-        ZStack(alignment: .top) {
-            Color(.systemGroupedBackground)
+    @Environment(\.repThemeSettings) private var themeSettings
+    @Environment(\.colorScheme) private var colorScheme
 
-            LinearGradient(
-                colors: [
-                    RepVisualSystem.tint.opacity(0.11),
-                    RepVisualSystem.tint.opacity(0.035),
-                    .clear
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .frame(height: 340)
-            .accessibilityHidden(true)
-        }
-        .ignoresSafeArea()
+    private var theme: RepTheme {
+        themeSettings.resolved(for: colorScheme)
+    }
+
+    var body: some View {
+        theme.canvasColor
+            .ignoresSafeArea()
     }
 }
 
@@ -48,22 +41,49 @@ struct RepGlassEffectGroup<Content: View>: View {
 }
 
 private struct RepSurfaceModifier: ViewModifier {
+    @Environment(\.repThemeSettings) private var themeSettings
+    @Environment(\.colorScheme) private var colorScheme
+
     let cornerRadius: CGFloat
+
+    private var theme: RepTheme {
+        themeSettings.resolved(for: colorScheme)
+    }
 
     func body(content: Content) -> some View {
         content
-            .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: cornerRadius))
+            .background {
+                theme.surfaceColor
+                    .clipShape(.rect(cornerRadius: cornerRadius))
+                    .shadow(color: theme.backdropShadow, radius: 10, x: 0, y: 4)
+            }
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.055), lineWidth: 0.5)
+                    .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
             }
     }
 }
 
+private struct RepSecondaryTextModifier: ViewModifier {
+    @Environment(\.repThemeSettings) private var themeSettings
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        content.foregroundStyle(themeSettings.resolved(for: colorScheme).secondaryText)
+    }
+}
+
 private struct RepGlassControlModifier: ViewModifier {
+    @Environment(\.repThemeSettings) private var themeSettings
+    @Environment(\.colorScheme) private var colorScheme
+
     let tint: Color?
     let cornerRadius: CGFloat
     let interactive: Bool
+
+    private var theme: RepTheme {
+        themeSettings.resolved(for: colorScheme)
+    }
 
     @ViewBuilder
     func body(content: Content) -> some View {
@@ -75,12 +95,20 @@ private struct RepGlassControlModifier: ViewModifier {
                 )
             } else {
                 content.glassEffect(
-                    .regular.interactive(interactive),
+                    .regular
+                        .tint(colorScheme == .dark ? theme.neutralControlTint : .clear)
+                        .interactive(interactive),
                     in: .rect(cornerRadius: cornerRadius)
                 )
             }
         } else {
             content
+                .background {
+                    if colorScheme == .dark {
+                        theme.neutralControlTint
+                            .clipShape(.rect(cornerRadius: cornerRadius))
+                    }
+                }
                 .background(.ultraThinMaterial, in: .rect(cornerRadius: cornerRadius))
                 .overlay {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -91,23 +119,55 @@ private struct RepGlassControlModifier: ViewModifier {
 }
 
 private struct RepPrimaryButtonModifier: ViewModifier {
+    @Environment(\.repThemeSettings) private var themeSettings
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var theme: RepTheme {
+        themeSettings.resolved(for: colorScheme)
+    }
+
     @ViewBuilder
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
-            content.buttonStyle(.glassProminent)
+            content
+                .buttonStyle(.glassProminent)
+                .foregroundStyle(theme.accentContent)
         } else {
-            content.buttonStyle(.borderedProminent)
+            content
+                .buttonStyle(.borderedProminent)
+                .foregroundStyle(theme.accentContent)
         }
     }
 }
 
 private struct RepSecondaryButtonModifier: ViewModifier {
+    @Environment(\.repThemeSettings) private var themeSettings
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var theme: RepTheme {
+        themeSettings.resolved(for: colorScheme)
+    }
+
     @ViewBuilder
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
-            content.buttonStyle(.glass)
+            if colorScheme == .dark {
+                content
+                    .buttonStyle(.glass)
+                    .tint(theme.neutralControlTint)
+                    .foregroundStyle(.primary)
+            } else {
+                content.buttonStyle(.glass)
+            }
         } else {
-            content.buttonStyle(.bordered)
+            if colorScheme == .dark {
+                content
+                    .buttonStyle(.bordered)
+                    .tint(theme.neutralControlTint)
+                    .foregroundStyle(.primary)
+            } else {
+                content.buttonStyle(.bordered)
+            }
         }
     }
 }
@@ -134,9 +194,63 @@ private struct RepSoftScrollEdgeModifier: ViewModifier {
     }
 }
 
+enum RepThemedList {
+    static let rowInsets = EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16)
+    static let sectionInsets = EdgeInsets(top: 4, leading: 16, bottom: 10, trailing: 16)
+}
+
+struct RepSectionHeader: View {
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .font(.subheadline.weight(.semibold))
+            .repSecondaryText()
+            .textCase(nil)
+    }
+}
+
 extension View {
+    func repSecondaryText() -> some View {
+        modifier(RepSecondaryTextModifier())
+    }
+
     func repSurface(cornerRadius: CGFloat = RepVisualSystem.cardRadius) -> some View {
         modifier(RepSurfaceModifier(cornerRadius: cornerRadius))
+    }
+
+    func repThemedListRow(
+        padding: CGFloat = 16,
+        cornerRadius: CGFloat = RepVisualSystem.controlRadius,
+        insets: EdgeInsets = RepThemedList.rowInsets
+    ) -> some View {
+        self
+            .padding(padding)
+            .repSurface(cornerRadius: cornerRadius)
+            .listRowInsets(insets)
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+    }
+
+    func repThemedListSection(
+        padding: CGFloat = 16,
+        cornerRadius: CGFloat = RepVisualSystem.controlRadius,
+        insets: EdgeInsets = RepThemedList.sectionInsets
+    ) -> some View {
+        self
+            .padding(padding)
+            .repSurface(cornerRadius: cornerRadius)
+            .listRowInsets(insets)
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+    }
+
+    func repThemedList() -> some View {
+        self
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .contentMargins(.bottom, RepVisualSystem.pageSpacing, for: .scrollContent)
+            .repSoftScrollEdges()
     }
 
     func repGlassControl(

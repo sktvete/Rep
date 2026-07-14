@@ -9,7 +9,7 @@ enum ExerciseInstructionFormatter {
             .filter { !$0.isEmpty }
     }
 
-    /// Formats ExerciseDB instruction lines for storage.
+    /// Formats imported instruction lines for storage.
     static func joined(from steps: [String]) -> String {
         steps
             .map(formatStep)

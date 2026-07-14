@@ -4,8 +4,8 @@ import Testing
 
 @Suite("Exercise instruction formatting")
 struct ExerciseInstructionFormatterTests {
-    @Test("ExerciseDB step prefixes are removed")
-    func exerciseDBSteps() {
+    @Test("Provider step prefixes are removed")
+    func providerSteps() {
         let raw = """
         Step:1 Lie face down on the floor with your legs extended behind you.
 

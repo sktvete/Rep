@@ -37,10 +37,10 @@ Done.
 Run a single benchmark:
   export PATH="$TOOLS:\$PATH"
   export REALESRGAN_MODEL=4x-UltraSharp-fp16
-  "$ROOT/run-benchmark.sh" --slug barbell-bench-press --download
+  "$ROOT/run-benchmark.sh" --manifest /path/to/licensed-media.json --slug example --download --rights-confirmed
 
-Run all 5 test exercises:
-  "$ROOT/run-benchmark.sh" --download
+Run a licensed manifest:
+  "$ROOT/run-benchmark.sh" --manifest /path/to/licensed-media.json --download --rights-confirmed
 
 Outputs (gitignored):
   scripts/exercise-media/benchmark/output/

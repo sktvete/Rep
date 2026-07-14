@@ -93,7 +93,7 @@ struct CustomExerciseView: View {
             equipment: equipment,
             measurementType: measurementType,
             isCustom: true,
-            instructions: notes.trimmingCharacters(in: .whitespacesAndNewlines)
+            userNotes: notes.trimmingCharacters(in: .whitespacesAndNewlines)
         )
         modelContext.insert(exercise)
         do {
@@ -110,4 +110,3 @@ struct CustomExerciseView: View {
         dismiss()
     }
 }
-

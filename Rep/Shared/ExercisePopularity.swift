@@ -2,7 +2,7 @@ import Foundation
 
 /// A curated, offline ranking of broadly popular strength exercises.
 ///
-/// ExerciseDB exposes no popularity signal, so "public popularity" is expressed as a
+/// The bundled catalog exposes no popularity signal, so "public popularity" is expressed as a
 /// hand-ordered list of the movements most people log. The first entry is the most
 /// popular. Anything not on the list sorts after ranked exercises via ``unrankedRank``.
 enum ExercisePopularity {

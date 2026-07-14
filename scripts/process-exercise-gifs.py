@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Split exercise GIFs into frames, upscale, swap white for green, re-encode."""
+"""Process exercise media that Rep has explicit rights to store and transform."""
 
 from __future__ import annotations
 
@@ -19,7 +19,6 @@ except ImportError:
     raise SystemExit(1)
 
 ROOT = Path(__file__).resolve().parent
-DEFAULT_MANIFEST = ROOT / "exercise-media" / "manifest.json"
 DEFAULT_MEDIA_ROOT = ROOT / "exercise-media"
 GREEN = (0, 255, 0)
 
@@ -192,7 +191,7 @@ def process_exercise(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
+    parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--media-root", type=Path, default=DEFAULT_MEDIA_ROOT)
     parser.add_argument("--target-size", type=int, default=720, help="Longest edge in pixels.")
     parser.add_argument(
@@ -203,11 +202,18 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--slug", action="append", help="Process only these manifest slugs.")
     parser.add_argument("--download", action="store_true", help="Re-download originals from CDN.")
+    parser.add_argument(
+        "--rights-confirmed",
+        action="store_true",
+        help="Confirm Rep has storage and transformation rights for every manifest asset.",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    if args.download and not args.rights_confirmed:
+        raise SystemExit("--download requires --rights-confirmed")
     manifest = load_manifest(args.manifest)
     if args.slug:
         wanted = set(args.slug)

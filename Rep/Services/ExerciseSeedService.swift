@@ -31,25 +31,77 @@ enum ExerciseSeedService {
     @discardableResult
     static func seedIfNeeded(in context: ModelContext) throws -> [Exercise] {
         let existing = try context.fetch(FetchDescriptor<Exercise>())
-        let existingNames = Set(existing.map(\.normalizedName))
-        let missing = seeds.filter { !existingNames.contains(ExerciseNameNormalizer.normalize($0.name)) }
-        let exercises = missing.map {
-            Exercise(
-                name: $0.name,
-                primaryMuscleGroup: $0.muscle,
-                secondaryMuscleGroups: $0.secondary,
-                equipment: $0.equipment,
-                measurementType: $0.measurement,
-                searchAliases: $0.aliases,
-                popularityRank: ExercisePopularity.rank(for: $0.name)
-            )
+        var byName: [String: Exercise] = [:]
+        for exercise in existing where byName[exercise.normalizedName] == nil {
+            byName[exercise.normalizedName] = exercise
         }
-        exercises.forEach(context.insert)
+        var inserted: [Exercise] = []
+        var didApplyCuratedMetadata = false
+
+        for seed in seeds {
+            let normalizedName = ExerciseNameNormalizer.normalize(seed.name)
+            if let exercise = byName[normalizedName], !exercise.isCustom {
+                var changed = false
+                changed = setIfChanged(exercise, \.primaryMuscleGroupRaw, seed.muscle.rawValue) || changed
+                changed = setIfChanged(exercise, \.secondaryMuscleGroupRaws, seed.secondary.map(\.rawValue)) || changed
+                changed = setIfChanged(exercise, \.equipmentRaw, seed.equipment.rawValue) || changed
+                changed = setIfChanged(exercise, \.measurementTypeRaw, seed.measurement.rawValue) || changed
+                let aliases = uniqueAliases(exercise.searchAliases + seed.aliases)
+                changed = setIfChanged(exercise, \.searchAliases, aliases) || changed
+                if changed {
+                    exercise.touch()
+                    didApplyCuratedMetadata = true
+                }
+                continue
+            }
+
+            let exercise = Exercise(
+                name: seed.name,
+                primaryMuscleGroup: seed.muscle,
+                secondaryMuscleGroups: seed.secondary,
+                equipment: seed.equipment,
+                measurementType: seed.measurement,
+                searchAliases: seed.aliases,
+                popularityRank: ExercisePopularity.rank(for: seed.name)
+            )
+            context.insert(exercise)
+            inserted.append(exercise)
+            byName[normalizedName] = exercise
+        }
 
         let didBackfillPopularity = backfillPopularity(for: existing)
         let didBackfillAliases = backfillSearchAliases(for: existing)
-        if !exercises.isEmpty || didBackfillPopularity || didBackfillAliases { try context.save() }
-        return exercises
+        if !inserted.isEmpty || didApplyCuratedMetadata || didBackfillPopularity || didBackfillAliases {
+            try context.save()
+        }
+        return inserted
+    }
+
+    @discardableResult
+    static func restoreCuratedMetadataIfPresent(for exercise: Exercise) -> Bool {
+        guard !exercise.isCustom,
+              let seed = seedsByNormalizedName[exercise.normalizedName]
+        else { return false }
+
+        var changed = false
+        changed = setIfChanged(exercise, \.name, seed.name) || changed
+        changed = setIfChanged(exercise, \.normalizedName, ExerciseNameNormalizer.normalize(seed.name)) || changed
+        changed = setIfChanged(exercise, \.primaryMuscleGroupRaw, seed.muscle.rawValue) || changed
+        changed = setIfChanged(exercise, \.secondaryMuscleGroupRaws, seed.secondary.map(\.rawValue)) || changed
+        changed = setIfChanged(exercise, \.equipmentRaw, seed.equipment.rawValue) || changed
+        changed = setIfChanged(exercise, \.measurementTypeRaw, seed.measurement.rawValue) || changed
+        changed = setIfChanged(exercise, \.searchAliases, seed.aliases) || changed
+        changed = setIfChanged(exercise, \.sourceName, nil) || changed
+        changed = setIfChanged(exercise, \.sourceURLString, nil) || changed
+        changed = setIfChanged(exercise, \.externalCatalogID, nil) || changed
+        changed = setIfChanged(exercise, \.mediaURLString, nil) || changed
+        changed = setIfChanged(exercise, \.instructions, "") || changed
+        changed = setIfChanged(exercise, \.bundledCatalogID, nil) || changed
+        changed = setIfChanged(exercise, \.bundledCatalogVersion, nil) || changed
+        if changed {
+            exercise.touch()
+        }
+        return true
     }
 
     /// Applies curated public-popularity ranks to any already-stored exercises that are
@@ -84,6 +136,30 @@ enum ExerciseSeedService {
         ExerciseNameNormalizer.normalize("Back Squat"): ["Squat"],
         ExerciseNameNormalizer.normalize("Triceps Pushdown"): ["Tricep Pushdown"],
     ]
+
+    private static let seedsByNormalizedName: [String: Seed] = Dictionary(
+        uniqueKeysWithValues: seeds.map { (ExerciseNameNormalizer.normalize($0.name), $0) }
+    )
+
+    private static func uniqueAliases(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        return values.compactMap { value in
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return nil }
+            let normalized = ExerciseNameNormalizer.normalize(trimmed)
+            return seen.insert(normalized).inserted ? trimmed : nil
+        }
+    }
+
+    private static func setIfChanged<T: Equatable>(
+        _ exercise: Exercise,
+        _ keyPath: ReferenceWritableKeyPath<Exercise, T>,
+        _ value: T
+    ) -> Bool {
+        guard exercise[keyPath: keyPath] != value else { return false }
+        exercise[keyPath: keyPath] = value
+        return true
+    }
 
     private static let seeds: [Seed] = [
         Seed("Barbell Bench Press", .chest, .barbell, secondary: [.triceps, .shoulders]),

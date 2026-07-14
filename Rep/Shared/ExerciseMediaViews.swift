@@ -1,73 +1,17 @@
-import ImageIO
 import SwiftUI
-import UIKit
-import WebKit
-
-struct ExerciseCatalogStatusView: View {
-    let isLoading: Bool
-    let progress: Double?
-    let errorMessage: String?
-    let onRetry: () -> Void
-
-    var body: some View {
-        if isLoading {
-            VStack(alignment: .leading, spacing: 7) {
-                HStack(spacing: 8) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Updating exercise catalog…")
-                        .font(.caption.weight(.medium))
-                    Spacer()
-                    if let progress {
-                        Text(progress, format: .percent.precision(.fractionLength(0)))
-                            .font(.caption.monospacedDigit())
-                            .repSecondaryText()
-                    }
-                }
-                if let progress {
-                    ProgressView(value: progress)
-                        .tint(.accentColor)
-                }
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Updating exercise catalog")
-            .accessibilityValue(progress.map { $0.formatted(.percent.precision(.fractionLength(0))) } ?? "In progress")
-        } else if let errorMessage {
-            HStack(alignment: .center, spacing: 10) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Catalog update paused")
-                        .font(.caption.weight(.semibold))
-                    Text(errorMessage)
-                        .font(.caption2)
-                        .repSecondaryText()
-                        .lineLimit(2)
-                }
-                Spacer()
-                Button("Retry", action: onRetry)
-                    .font(.caption.weight(.semibold))
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-            }
-        }
-    }
-}
 
 struct ExercisePickerRow: View {
     let exercise: Exercise
-    let loadsImages: Bool
     let onSelect: () -> Void
     let onShowDetails: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
             Button(action: onShowDetails) {
-                ExerciseMediaThumbnail(exercise: exercise, loadsImage: loadsImages)
+                ExerciseMediaThumbnail(exercise: exercise)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Show how to perform \(exercise.name)")
+            .accessibilityLabel("Show details for \(exercise.name)")
 
             Button(action: onSelect) {
                 HStack(spacing: 12) {
@@ -99,63 +43,13 @@ struct ExercisePickerRow: View {
     }
 }
 
+/// A deterministic local placeholder. Exercise media is shown only after Rep has a
+/// redistribution license and serves assets from Rep-controlled storage.
 struct ExerciseMediaThumbnail: View {
     let exercise: Exercise
     var size: CGFloat = 58
-    var loadsImage: Bool = true
-
-    private var mediaURL: URL? {
-        guard let value = exercise.mediaURLString,
-              !value.isEmpty else { return nil }
-        return URL(string: value)
-    }
-
-    @Environment(\.displayScale) private var displayScale
-    @State private var image: UIImage?
-    @State private var didFail = false
 
     var body: some View {
-        Group {
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else if didFail || mediaURL == nil {
-                placeholder
-            } else {
-                placeholder
-                    .overlay { ProgressView().controlSize(.small) }
-            }
-        }
-        .frame(width: size, height: size)
-        .background(Color(.tertiarySystemGroupedBackground))
-        .clipShape(.rect(cornerRadius: max(10, size * 0.2)))
-        .overlay {
-            RoundedRectangle(cornerRadius: max(10, size * 0.2))
-                .strokeBorder(Color.primary.opacity(0.06))
-        }
-        .accessibilityHidden(true)
-        .task(id: loadTaskID) {
-            image = nil
-            didFail = false
-            guard loadsImage, let mediaURL else { return }
-            let maxPixel = size * max(1, displayScale)
-            let loaded = await ExerciseThumbnailCache.shared.thumbnail(for: mediaURL, maxPixelSize: maxPixel)
-            guard !Task.isCancelled else { return }
-            if let loaded {
-                image = loaded
-            } else {
-                didFail = true
-            }
-        }
-    }
-
-    private var loadTaskID: String {
-        guard loadsImage, let mediaURL else { return "idle" }
-        return mediaURL.absoluteString
-    }
-
-    private var placeholder: some View {
         ZStack {
             LinearGradient(
                 colors: [Color.accentColor.opacity(0.16), Color.accentColor.opacity(0.055)],
@@ -166,6 +60,14 @@ struct ExerciseMediaThumbnail: View {
                 .font(.system(size: size * 0.32, weight: .semibold))
                 .foregroundStyle(.tint)
         }
+        .frame(width: size, height: size)
+        .background(Color(.tertiarySystemGroupedBackground))
+        .clipShape(.rect(cornerRadius: max(10, size * 0.2)))
+        .overlay {
+            RoundedRectangle(cornerRadius: max(10, size * 0.2))
+                .strokeBorder(Color.primary.opacity(0.06))
+        }
+        .accessibilityHidden(true)
     }
 
     private var symbolName: String {
@@ -182,148 +84,29 @@ struct ExerciseMediaThumbnail: View {
     }
 }
 
-/// Loads and caches small, static exercise thumbnails.
-///
-/// Catalog media are animated GIFs. Rendering hundreds of them with `AsyncImage` decodes
-/// every frame and thrashes memory while the list scrolls. This cache downsamples just
-/// the first frame to the displayed size via ImageIO and keeps results in memory, so the
-/// picker stays smooth even with the full catalog. On-disk byte caching is handled by the
-/// shared `URLCache`.
-actor ExerciseThumbnailCache {
-    static let shared = ExerciseThumbnailCache()
-
-    private let memory = NSCache<NSString, UIImage>()
-    private var inFlight: [String: Task<UIImage?, Never>] = [:]
-    private let session: URLSession
-
-    init(session: URLSession = .shared) {
-        self.session = session
-        memory.countLimit = 400
-    }
-
-    func thumbnail(for url: URL, maxPixelSize: CGFloat) async -> UIImage? {
-        let maxPixel = max(1, maxPixelSize)
-        let key = "\(url.absoluteString)|\(Int(maxPixel))"
-
-        if let cached = memory.object(forKey: key as NSString) { return cached }
-        if let task = inFlight[key] { return await task.value }
-
-        let task = Task<UIImage?, Never>.detached(priority: .utility) { [session] in
-            var request = URLRequest(url: url)
-            request.setValue("image/*", forHTTPHeaderField: "Accept")
-            guard let (data, response) = try? await session.data(for: request),
-                  (response as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) ?? true,
-                  let image = Self.downsample(data: data, maxPixelSize: maxPixel)
-            else { return nil }
-            return image
-        }
-        inFlight[key] = task
-        let image = await task.value
-        inFlight[key] = nil
-        if let image { memory.setObject(image, forKey: key as NSString) }
-        return image
-    }
-
-    private static func downsample(data: Data, maxPixelSize: CGFloat) -> UIImage? {
-        let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
-        guard let source = CGImageSourceCreateWithData(data as CFData, sourceOptions) else { return nil }
-        let options = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceShouldCacheImmediately: true,
-            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize
-        ] as CFDictionary
-        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options) else { return nil }
-        return UIImage(cgImage: cgImage)
-    }
-}
-
-struct ExerciseAnimatedMediaView: UIViewRepresentable {
-    let url: URL
-    let accessibilityLabel: String
-
-    func makeUIView(context: Context) -> WKWebView {
-        let configuration = WKWebViewConfiguration()
-        configuration.allowsInlineMediaPlayback = true
-        configuration.mediaTypesRequiringUserActionForPlayback = .all
-
-        let webView = WKWebView(frame: .zero, configuration: configuration)
-        webView.isOpaque = false
-        webView.backgroundColor = .clear
-        webView.scrollView.backgroundColor = .clear
-        webView.scrollView.isScrollEnabled = false
-        webView.scrollView.bounces = false
-        webView.isAccessibilityElement = true
-        webView.accessibilityLabel = accessibilityLabel
-        return webView
-    }
-
-    func updateUIView(_ webView: WKWebView, context: Context) {
-        guard context.coordinator.loadedURL != url else { return }
-        context.coordinator.loadedURL = url
-
-        let source = htmlEscaped(url.absoluteString)
-        let isVideo = ["mp4", "mov", "m4v", "webm"].contains(url.pathExtension.lowercased())
-        let media = isVideo
-            ? "<video src=\"\(source)\" controls playsinline preload=\"metadata\"></video>"
-            : "<img src=\"\(source)\" alt=\"Exercise demonstration\">"
-        let html = """
-        <!doctype html>
-        <html>
-        <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-          <style>
-            * { box-sizing: border-box; }
-            html, body { width: 100%; height: 100%; margin: 0; background: transparent; overflow: hidden; }
-            body { display: flex; align-items: center; justify-content: center; }
-            img, video { display: block; width: 100%; height: 100%; object-fit: contain; }
-          </style>
-        </head>
-        <body>\(media)</body>
-        </html>
-        """
-        webView.loadHTMLString(html, baseURL: nil)
-    }
-
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    final class Coordinator {
-        var loadedURL: URL?
-    }
-
-    private func htmlEscaped(_ value: String) -> String {
-        value
-            .replacingOccurrences(of: "&", with: "&amp;")
-            .replacingOccurrences(of: "\"", with: "&quot;")
-            .replacingOccurrences(of: "<", with: "&lt;")
-            .replacingOccurrences(of: ">", with: "&gt;")
-    }
-}
-
 struct ExerciseDetailView: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var modelContext
 
     let exercise: Exercise
 
-    @State private var catalogService = ExerciseDBCatalogService()
-    @State private var isLoadingReference = false
-    @State private var referenceError: String?
-
-    private var mediaURL: URL? {
-        guard let value = exercise.mediaURLString,
-              !value.isEmpty else { return nil }
-        return URL(string: value)
-    }
-
     private var sourceURL: URL? {
         guard let value = exercise.sourceURLString,
-              !value.isEmpty else { return nil }
-        return URL(string: value)
+              let url = URL(string: value),
+              let scheme = url.scheme?.lowercased(),
+              scheme == "https" || scheme == "http"
+        else { return nil }
+        return url
     }
 
     private var instructionSteps: [String] {
         ExerciseInstructionFormatter.steps(from: exercise.instructions)
+    }
+
+    private var userNotes: String? {
+        guard let value = exercise.userNotes?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !value.isEmpty
+        else { return nil }
+        return value
     }
 
     var body: some View {
@@ -353,15 +136,19 @@ struct ExerciseDetailView: View {
 
                     instructions
 
+                    if let userNotes {
+                        notes(userNotes)
+                    }
+
                     if let sourceURL {
                         Link(destination: sourceURL) {
                             HStack(spacing: 10) {
                                 Image(systemName: "safari")
                                 VStack(alignment: .leading, spacing: 1) {
-                                    Text("Exercise source")
+                                    Text("Catalog source")
                                         .font(.caption)
                                         .repSecondaryText()
-                                    Text(exercise.sourceName ?? "View original")
+                                    Text(exercise.sourceName ?? "View source")
                                         .font(.subheadline.weight(.semibold))
                                 }
                                 Spacer()
@@ -379,15 +166,12 @@ struct ExerciseDetailView: View {
                 .padding(.bottom, 24)
             }
             .background(RepScreenBackground())
-            .navigationTitle("Form Reference")
+            .navigationTitle("Exercise Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
-            }
-            .task(id: exercise.mediaURLString) {
-                await loadReferenceIfNeeded()
             }
         }
     }
@@ -402,69 +186,21 @@ struct ExerciseDetailView: View {
             .joined(separator: ", ")
     }
 
-    @ViewBuilder
     private var media: some View {
-        if let mediaURL {
-            ExerciseAnimatedMediaView(
-                url: mediaURL,
-                accessibilityLabel: "Animated demonstration of \(exercise.name)"
-            )
-            .frame(maxWidth: .infinity)
-            .aspectRatio(4 / 3, contentMode: .fit)
-            .background(Color(.secondarySystemGroupedBackground))
-            .clipShape(.rect(cornerRadius: RepVisualSystem.cardRadius))
-            .overlay {
-                RoundedRectangle(cornerRadius: RepVisualSystem.cardRadius)
-                    .strokeBorder(Color.primary.opacity(0.07))
-            }
-        } else {
-            VStack(spacing: 10) {
-                if isLoadingReference {
-                    ProgressView()
-                        .controlSize(.large)
-                    Text("Loading movement reference…")
-                        .font(.subheadline.weight(.medium))
-                        .repSecondaryText()
-                } else {
-                    Image(systemName: "figure.strengthtraining.traditional")
-                        .font(.system(size: 42, weight: .medium))
-                        .foregroundStyle(.tint)
-                    Text(referenceError ?? "Movement reference coming soon")
-                        .font(.subheadline.weight(.medium))
-                        .repSecondaryText()
-                        .multilineTextAlignment(.center)
-                    if referenceError != nil {
-                        Button("Try Again") {
-                            Task { await loadReferenceIfNeeded() }
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                }
-            }
-            .padding()
-            .frame(maxWidth: .infinity)
-            .aspectRatio(4 / 3, contentMode: .fit)
-            .background(Color.accentColor.opacity(0.08))
-            .clipShape(.rect(cornerRadius: RepVisualSystem.cardRadius))
+        VStack(spacing: 10) {
+            Image(systemName: "figure.strengthtraining.traditional")
+                .font(.system(size: 42, weight: .medium))
+                .foregroundStyle(.tint)
+            Text("Movement media isn’t bundled yet")
+                .font(.subheadline.weight(.medium))
+                .repSecondaryText()
+                .multilineTextAlignment(.center)
         }
-    }
-
-    private func loadReferenceIfNeeded() async {
-        guard mediaURL == nil, !isLoadingReference else { return }
-        isLoadingReference = true
-        referenceError = nil
-        defer { isLoadingReference = false }
-
-        do {
-            let loaded = try await catalogService.enrichExerciseIfNeeded(exercise, in: modelContext)
-            if !loaded, mediaURL == nil {
-                referenceError = "No movement reference is available yet."
-            }
-        } catch is CancellationError {
-            return
-        } catch {
-            referenceError = "Couldn’t load the movement reference."
-        }
+        .padding()
+        .frame(maxWidth: .infinity)
+        .aspectRatio(4 / 3, contentMode: .fit)
+        .background(Color.accentColor.opacity(0.08))
+        .clipShape(.rect(cornerRadius: RepVisualSystem.cardRadius))
     }
 
     @ViewBuilder
@@ -523,6 +259,20 @@ struct ExerciseDetailView: View {
             Text("Use this as a general form guide. Adjust setup and technique for your body, equipment, and goals.")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .repSurface(cornerRadius: RepVisualSystem.cardRadius)
+    }
+
+    private func notes(_ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Notes")
+                .font(.title3.bold())
+            Text(value)
+                .font(.body)
+                .foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

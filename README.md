@@ -15,11 +15,11 @@ Rep is an adaptive logbook, not a coach. Suggestions describe observed behavior 
 
 ## Exercise catalog and form references
 
-The app starts with its curated offline exercise library, then incrementally synchronizes the free ExerciseDB catalog when an exercise picker is opened. The current catalog contains approximately 1,500 exercises with GIF demonstrations, muscle and equipment metadata, and step-by-step instructions. Catalog pages are saved immediately, so an interrupted update resumes without discarding earlier pages.
+Rep ships a versioned catalog of 873 exercises inside the app. Names, muscle groups, equipment, search aliases, and logging measurement types are available on a fresh installation without a network request. A curated overlay keeps common strength movements classified consistently.
 
-Search ranks names, common aliases, muscles, and equipment together, including prefix and typo matching. Queries such as “Back dead” prioritize deadlift variations instead of simply filtering by literal title text. A short debounced online lookup can surface uncommon exercises before the full background catalog update reaches them.
+The catalog is generated from a pinned revision of the public-domain [Free Exercise DB](https://github.com/yuhonas/free-exercise-db). The generator verifies the source revision and digest; the app verifies the bundled payload schema, item count, domain values, and SHA-256 digest before an idempotent SwiftData import. Upstream instructions and images are deliberately excluded; their provenance and distribution rights require a separate review.
 
-Catalog metadata remains available offline after synchronization. Demonstration media loads on demand and may require a connection if it is not already cached. Each form-reference screen includes source attribution and uses observational language rather than presenting the demonstration as authoritative coaching.
+Search ranks names, common aliases, muscles, and equipment together, including prefix and typo matching. Queries such as “Back dead” prioritize deadlift variations instead of simply filtering by literal title text.
 
 Open `Rep.xcodeproj` in the current stable Xcode. Select an iPhone simulator and run the `Rep` scheme. Run tests with Product → Test or:
 
@@ -45,12 +45,12 @@ Measurement types include weight/repetitions, repetitions-only, duration, weight
 
 ## Sample data
 
-Production users receive the modest built-in exercise library but no fabricated workout history. In a Debug build, Settings offers development sample data with Push, Pull and Legs routines, several weeks of deterministic training history, bodyweight entries and an active-workout recovery example. Sample data can also be removed from Settings.
+Production users receive the complete bundled offline catalog but no fabricated workout history. In a Debug build, Settings offers development sample data with Push, Pull and Legs routines, several weeks of deterministic training history, bodyweight entries and an active-workout recovery example. Sample data can also be removed from Settings.
 
 ## Current limitations
 
 - Logging and data remain on this device; CloudKit is not enabled.
-- Exercise catalog updates and uncached demonstrations depend on ExerciseDB availability and an internet connection.
+- Licensed movement instructions and demonstration media are not bundled yet.
 - HealthKit permission is not requested and no health data is read or written.
 - Rest timer feedback is in-app; richer Lock Screen behavior is planned behind the timer service boundary.
 - Routine-difference reconciliation is intentionally lightweight in this MVP.

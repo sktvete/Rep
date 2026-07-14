@@ -45,11 +45,13 @@ Kilograms are the canonical stored mass unit. The user’s kilograms/pounds sett
 
 ## Exercise discovery and media
 
-The curated local exercise library remains immediately available offline. `ExerciseDBCatalogService` augments it with a cursor-paginated remote catalog, saving each page to SwiftData before advancing a durable checkpoint. Existing records merge by external identifier or normalized name; remote searches can import close matches while the full catalog continues in the background.
+`BundledExerciseCatalogService` loads a versioned catalog from the application bundle. It verifies the schema, declared item count, unique stable IDs and names, domain enum values, and SHA-256 digest before changing SwiftData. Import merges by stable catalog ID and then normalized name, saves once, and is idempotent. A fresh installation therefore has the same baseline catalog with no network dependency.
+
+The bundled release contains factual taxonomy from a pinned public-domain source. A curated overlay owns classification for Rep’s common lifts. Earlier API-derived records are migrated in place when a safe bundled or curated name match exists, preserving routine and workout relationships; unreferenced provider records and provider caches are removed. Unmatched records referenced by user history retain only object identity and relationships, are archived under a neutral local placeholder, and lose provider metadata.
 
 `ExerciseSearchEngine` deterministically ranks name, alias, muscle, and equipment matches. Complete multi-token matches outrank partial matches, and bounded edit distance supports small typing errors without turning unrelated results into suggestions.
 
-Picker thumbnails use the remote GIF’s first frame. A form-reference sheet loads animated GIF or video media only when requested, so browsing and workout logging do not create a large up-front media cost. Catalog metadata is persisted; media remains an on-demand boundary suitable for a later explicit download manager.
+Exercise views currently use local symbolic placeholders. Media will ship only after Rep has explicit perpetual storage, redistribution, transformation, backup, and self-hosting rights. The generic media-processing scripts require a caller-supplied manifest and an explicit rights confirmation before downloading.
 
 ## Future boundaries
 

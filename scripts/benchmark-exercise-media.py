@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Benchmark exercise GIF processing: split, upscale, white-key, encode."""
+"""Benchmark processing for exercise media Rep has explicit rights to transform."""
 
 from __future__ import annotations
 
@@ -23,7 +23,6 @@ except ImportError:
     raise SystemExit(1)
 
 ROOT = Path(__file__).resolve().parent
-DEFAULT_MANIFEST = ROOT / "exercise-media" / "manifest.json"
 DEFAULT_MEDIA_ROOT = ROOT / "exercise-media" / "benchmark"
 
 
@@ -419,12 +418,17 @@ def write_report(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
+    parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--media-root", type=Path, default=DEFAULT_MEDIA_ROOT)
     parser.add_argument("--target-size", type=int, default=720)
     parser.add_argument("--white-threshold", type=int, default=235)
     parser.add_argument("--slug", action="append")
     parser.add_argument("--download", action="store_true")
+    parser.add_argument(
+        "--rights-confirmed",
+        action="store_true",
+        help="Confirm Rep has storage and transformation rights for every manifest asset.",
+    )
     parser.add_argument(
         "--upscale",
         choices=["auto", "pillow-lanczos", "realesrgan-ncnn-vulkan"],
@@ -441,6 +445,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    if args.download and not args.rights_confirmed:
+        raise SystemExit("--download requires --rights-confirmed")
     manifest = load_manifest(args.manifest)
     if args.slug:
         wanted = set(args.slug)

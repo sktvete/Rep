@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "2026.05.24.2",
+  "publishedAt": "2026-05-24T03:09:39Z",
+  "payloadFilename": "rep-exercise-catalog-v1.json",
+  "itemCount": 873,
+  "payloadSHA256": "01b15c0f7191542a154cc0f0b2fc5aa299c44683985d3fbf98d9e4beef1d4c83",
+  "source": {
+    "name": "Free Exercise DB",
+    "url": "https://github.com/yuhonas/free-exercise-db",
+    "revision": "b0eed061e1c832b3ed815fbaa4b45b3cdc14df49",
+    "sourceSHA256": "d68a817484964095e6af0be2cdcbcc2c2504168d1d190c7d5c725ce52f3ae1f4",
+    "license": "Unlicense",
+    "licenseURL": "https://raw.githubusercontent.com/yuhonas/free-exercise-db/b0eed061e1c832b3ed815fbaa4b45b3cdc14df49/LICENSE.md"
+  },
+  "contentPolicy": {
+    "included": [
+      "exercise names",
+      "muscle taxonomy",
+      "equipment taxonomy"
+    ],
+    "excluded": [
+      "instructions",
+      "images"
+    ]
+  }
+}

@@ -22,7 +22,7 @@ struct ActiveWorkoutView: View {
     @State private var isShowingExercisePicker = false
     @State private var isShowingExerciseOrder = false
     @State private var replacementTarget: WorkoutExercise?
-    @State private var formReferenceExercise: Exercise?
+    @State private var detailExercise: Exercise?
     @State private var isShowingFinishConfirmation = false
     @State private var isShowingDiscardConfirmation = false
     @State private var isShowingRemoveExerciseConfirmation = false
@@ -131,7 +131,7 @@ struct ActiveWorkoutView: View {
                 replace(target, with: exercise)
             }
         }
-        .sheet(item: $formReferenceExercise) { exercise in
+        .sheet(item: $detailExercise) { exercise in
             ExerciseDetailView(exercise: exercise)
         }
         .sheet(isPresented: $isShowingExerciseOrder) {
@@ -369,23 +369,23 @@ struct ActiveWorkoutView: View {
 
             if let exercise = workoutExercise.exercise {
                 Button {
-                    formReferenceExercise = exercise
+                    detailExercise = exercise
                 } label: {
-                    Label("How to", systemImage: "play.rectangle")
+                    Label("Details", systemImage: "info.circle")
                         .font(.subheadline.weight(.semibold))
                         .padding(.horizontal, 12)
                         .frame(minHeight: 44)
                         .repGlassControl(cornerRadius: 99)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("How to perform \(exercise.name)")
-                .accessibilityHint("Opens the movement demonstration and instructions")
+                .accessibilityLabel("View details for \(exercise.name)")
+                .accessibilityHint("Opens exercise details and any saved instructions")
             }
 
             Menu("Exercise options", systemImage: "ellipsis.circle") {
                 if let exercise = workoutExercise.exercise {
-                    Button("View form reference", systemImage: "play.rectangle") {
-                        formReferenceExercise = exercise
+                    Button("View exercise details", systemImage: "info.circle") {
+                        detailExercise = exercise
                     }
                     Divider()
                 }

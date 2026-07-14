@@ -13,7 +13,16 @@ final class Exercise {
     var isCustom: Bool
     var isArchived: Bool
     var instructions: String
+    /// User-authored notes for custom/local context. Catalog guidance belongs in
+    /// `instructions`, which lets licensing migrations clear imported guidance
+    /// without erasing notes the user wrote after this field existed.
+    var userNotes: String?
     var videoAssetIdentifier: String?
+    /// Stable identity from Rep's versioned, app-bundled catalog.
+    var bundledCatalogID: String?
+    /// Catalog release that last supplied this record's canonical metadata.
+    /// Nil means an existing curated, imported, or user-created record won a name merge.
+    var bundledCatalogVersion: String?
     var externalCatalogID: String?
     var mediaURLString: String?
     var sourceURLString: String?
@@ -55,7 +64,10 @@ final class Exercise {
         isCustom: Bool = false,
         isArchived: Bool = false,
         instructions: String = "",
+        userNotes: String? = nil,
         videoAssetIdentifier: String? = nil,
+        bundledCatalogID: String? = nil,
+        bundledCatalogVersion: String? = nil,
         externalCatalogID: String? = nil,
         mediaURLString: String? = nil,
         sourceURLString: String? = nil,
@@ -75,7 +87,10 @@ final class Exercise {
         self.isCustom = isCustom
         self.isArchived = isArchived
         self.instructions = instructions
+        self.userNotes = userNotes?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         self.videoAssetIdentifier = videoAssetIdentifier
+        self.bundledCatalogID = bundledCatalogID
+        self.bundledCatalogVersion = bundledCatalogVersion
         self.externalCatalogID = externalCatalogID
         self.mediaURLString = mediaURLString
         self.sourceURLString = sourceURLString
@@ -95,4 +110,10 @@ final class Exercise {
     }
 
     func touch(at date: Date = .now) { updatedAt = date }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
+    }
 }

@@ -10,7 +10,6 @@ struct RoutineEditorView: View {
     @State private var itemBeingConfigured: RoutineExercise?
     @State private var routinePendingDeletion = false
     @State private var operationError: String?
-    @State private var catalogService = ExerciseDBCatalogService()
     @State private var debouncedSaveTask: Task<Void, Never>?
 
     private let onStartRoutine: () -> Void
@@ -156,13 +155,6 @@ struct RoutineEditorView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(operationError ?? "Please try again.")
-        }
-        .task {
-            do {
-                _ = try catalogService.backfillMissingMediaLocally(in: modelContext)
-            } catch {
-                AppLog.persistenceFailure(operation: "Backfill routine exercise media", error: error)
-            }
         }
     }
 

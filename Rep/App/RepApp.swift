@@ -30,7 +30,6 @@ private struct AppRootView: View {
 
     @State private var presentedWorkout: WorkoutSession?
     @State private var startupError: String?
-    @State private var catalogService = ExerciseDBCatalogService()
 
     var body: some View {
         TabView {
@@ -66,15 +65,16 @@ private struct AppRootView: View {
         .task {
             HapticEngineManager.shared.warm()
             RestTimerLiveActivityManager.reconcileOnLaunch()
-            bootstrapLocalStore()
+            await bootstrapLocalStore()
             warmExercisePickerCache()
-            await synchronizeExerciseCatalog()
         }
         .alert("Rep couldn’t prepare local data", isPresented: Binding(
             get: { startupError != nil },
             set: { if !$0 { startupError = nil } }
         )) {
-            Button("Try Again") { bootstrapLocalStore() }
+            Button("Try Again") {
+                Task { await bootstrapLocalStore() }
+            }
             Button("Dismiss", role: .cancel) {}
         } message: {
             Text(startupError ?? "Please try again.")
@@ -124,7 +124,25 @@ private struct AppRootView: View {
         }
     }
 
-    private func bootstrapLocalStore() {
+    private func bootstrapLocalStore() async {
+        var catalogPreparationError: Error?
+
+        do {
+            _ = try BundledExerciseCatalogService.seedIfNeeded(in: modelContext)
+        } catch {
+            catalogPreparationError = error
+            AppLog.persistenceFailure(operation: "Load bundled exercise catalog", error: error)
+        }
+
+        // This cleanup must run even if a damaged app resource prevents import.
+        // Persisted third-party content is not an acceptable fallback catalog.
+        do {
+            _ = try await LegacyExerciseDBDataRemovalService.removeUnlicensedData(in: modelContext)
+        } catch {
+            catalogPreparationError = catalogPreparationError ?? error
+            AppLog.persistenceFailure(operation: "Remove legacy exercise catalog data", error: error)
+        }
+
         do {
             _ = try ExerciseSeedService.seedIfNeeded(in: modelContext)
             if let existing = settings.first {
@@ -133,21 +151,12 @@ private struct AppRootView: View {
                 modelContext.insert(UserSettings())
             }
             try modelContext.save()
+            if let catalogPreparationError {
+                startupError = catalogPreparationError.localizedDescription
+            }
         } catch {
             AppLog.persistenceFailure(operation: "Bootstrap local store", error: error)
             startupError = error.localizedDescription
-        }
-    }
-
-    private func synchronizeExerciseCatalog() async {
-        do {
-            try await catalogService.synchronize(in: modelContext)
-            _ = try catalogService.backfillMissingMediaLocally(in: modelContext)
-            warmExercisePickerCache()
-        } catch is CancellationError {
-            return
-        } catch {
-            AppLog.persistenceFailure(operation: "Synchronize exercise catalog", error: error)
         }
     }
 

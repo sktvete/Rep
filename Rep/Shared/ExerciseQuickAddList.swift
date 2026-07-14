@@ -15,9 +15,7 @@ struct ExerciseQuickAddList: View {
 
     @State private var searchText = ""
     @State private var detailExercise: Exercise?
-    @State private var thumbnailsEnabled = false
     @State private var prepareTask: Task<Void, Never>?
-    @State private var thumbnailTask: Task<Void, Never>?
 
     private var searchModel: ExercisePickerSearchModel { ExercisePickerSessionCache.searchModel }
 
@@ -41,7 +39,6 @@ struct ExerciseQuickAddList: View {
                     ForEach(searchModel.displayed) { exercise in
                         ExercisePickerRow(
                             exercise: exercise,
-                            loadsImages: thumbnailsEnabled,
                             onSelect: {
                                 onSelect(exercise)
                                 if dismissOnSelect {
@@ -84,25 +81,16 @@ struct ExerciseQuickAddList: View {
             ExerciseDetailView(exercise: exercise)
         }
         .onAppear {
-            ExercisePickerThumbnailGate.disableThumbnails(&thumbnailsEnabled, task: &thumbnailTask)
             schedulePrepare()
         }
         .onDisappear {
             prepareTask?.cancel()
-            ExercisePickerThumbnailGate.disableThumbnails(&thumbnailsEnabled, task: &thumbnailTask)
         }
         .onChange(of: searchText) { _, newValue in
             ExercisePickerSessionCache.prepare(
                 exercises: exercises,
                 query: newValue,
                 in: modelContext
-            )
-        }
-        .onChange(of: searchModel.isRefreshing) { _, isRefreshing in
-            ExercisePickerThumbnailGate.scheduleReveal(
-                thumbnailsEnabled: $thumbnailsEnabled,
-                isSearching: isRefreshing,
-                task: &thumbnailTask
             )
         }
         .onChange(of: exercises.count) { _, _ in
@@ -123,12 +111,6 @@ struct ExerciseQuickAddList: View {
                 exercises: exercises,
                 query: searchText,
                 in: modelContext
-            )
-            guard !Task.isCancelled else { return }
-            ExercisePickerThumbnailGate.scheduleReveal(
-                thumbnailsEnabled: $thumbnailsEnabled,
-                isSearching: searchModel.isRefreshing,
-                task: &thumbnailTask
             )
         }
     }

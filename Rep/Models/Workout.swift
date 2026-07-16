@@ -9,6 +9,9 @@ final class WorkoutSession {
     var startedAt: Date
     var completedAt: Date?
     var stateRaw: String
+    // Snapshot the routine color so history keeps its identity if the routine
+    // is later deleted. Optional keeps older stores migration-compatible.
+    var routineColorPresetRaw: String?
     var notes: String
     var createdAt: Date
     var updatedAt: Date
@@ -18,6 +21,11 @@ final class WorkoutSession {
     var state: WorkoutState {
         get { WorkoutState(rawValue: stateRaw) ?? .planned }
         set { stateRaw = newValue.rawValue; updatedAt = .now }
+    }
+
+    var routineColorPreset: RoutineColorPreset? {
+        get { routineColorPresetRaw.flatMap(RoutineColorPreset.init(rawValue:)) }
+        set { routineColorPresetRaw = newValue?.rawValue }
     }
 
     var orderedExercises: [WorkoutExercise] {
@@ -48,6 +56,7 @@ final class WorkoutSession {
         startedAt: Date = .now,
         completedAt: Date? = nil,
         state: WorkoutState = .active,
+        routineColorPreset: RoutineColorPreset? = nil,
         notes: String = "",
         exercises: [WorkoutExercise] = [],
         createdAt: Date? = nil,
@@ -59,6 +68,7 @@ final class WorkoutSession {
         self.startedAt = startedAt
         self.completedAt = completedAt
         stateRaw = state.rawValue
+        routineColorPresetRaw = routineColorPreset?.rawValue
         self.notes = notes
         let createdAt = createdAt ?? startedAt
         self.createdAt = createdAt

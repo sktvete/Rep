@@ -36,6 +36,35 @@ struct BundledExerciseCatalogTests {
         }) == originalIDs)
     }
 
+    @Test("A repeat bundled import preserves optional remote enrichment")
+    func preservesRemoteEnrichmentOnRepeatImport() throws {
+        let container = try TestFixtures.container()
+        let context = ModelContext(container)
+        _ = try BundledExerciseCatalogService.seedIfNeeded(in: context, bundle: .main)
+
+        let exercises = try context.fetch(FetchDescriptor<Exercise>())
+        let exercise = try #require(
+            exercises.first { $0.bundledCatalogID == "rep:free-exercise-db:3_4_Sit-Up" }
+        )
+        exercise.externalCatalogID = "optional-provider-id"
+        exercise.mediaURLString = "https://static.exercisedb.dev/media/optional.gif"
+        exercise.instructions = "Optional remote instructions"
+        exercise.sourceName = "ExerciseDB by AscendAPI"
+        exercise.sourceURLString = "https://ascendapi.com"
+        exercise.searchAliases.append("optional remote alias")
+        try context.save()
+
+        let second = try BundledExerciseCatalogService.seedIfNeeded(in: context, bundle: .main)
+
+        #expect(second.insertedItems == 0)
+        #expect(exercise.externalCatalogID == "optional-provider-id")
+        #expect(exercise.mediaURLString == "https://static.exercisedb.dev/media/optional.gif")
+        #expect(exercise.instructions == "Optional remote instructions")
+        #expect(exercise.sourceName == "ExerciseDB by AscendAPI")
+        #expect(exercise.sourceURLString == "https://ascendapi.com")
+        #expect(exercise.searchAliases.contains("optional remote alias"))
+    }
+
     @Test("A corrupt payload fails before SwiftData is mutated")
     func rejectsCorruptPayload() throws {
         let container = try TestFixtures.container()
@@ -251,6 +280,57 @@ struct BundledExerciseCatalogTests {
         #expect(custom.searchAliases.isEmpty)
     }
 
+    @Test("Legacy cleanup runs once and preserves later optional media enrichment")
+    func cleanupDoesNotRepeatAfterMigration() async throws {
+        let container = try TestFixtures.container()
+        let context = ModelContext(container)
+        let defaults = migrationDefaults()
+
+        let first = Exercise(
+            name: "Old Provider Exercise",
+            primaryMuscleGroup: .back,
+            equipment: .cable,
+            externalCatalogID: "old-provider-id"
+        )
+        context.insert(first)
+        try context.save()
+
+        let initial = try await LegacyExerciseDBDataRemovalService.removeUnlicensedData(
+            in: context,
+            defaults: defaults,
+            clearSharedCaches: false
+        )
+        #expect(initial.deletedUnreferencedExercises == 1)
+        #expect(defaults.bool(forKey: LegacyExerciseDBDataRemovalService.migrationKey))
+
+        let enriched = Exercise(
+            name: "Optional Remote Exercise",
+            primaryMuscleGroup: .biceps,
+            equipment: .cable,
+            externalCatalogID: "later-provider-id",
+            mediaURLString: "https://static.exercisedb.dev/media/later.gif"
+        )
+        context.insert(enriched)
+        try context.save()
+
+        let repeated = try await LegacyExerciseDBDataRemovalService.removeUnlicensedData(
+            in: context,
+            defaults: defaults,
+            clearSharedCaches: false
+        )
+
+        #expect(repeated == LegacyExerciseDBDataRemovalSummary(
+            convertedToBundledCatalog: 0,
+            retainedCustomExercises: 0,
+            clearedAmbiguousCustomNotes: 0,
+            retainedUserReferences: 0,
+            deletedUnreferencedExercises: 0
+        ))
+        #expect(enriched.externalCatalogID == "later-provider-id")
+        #expect(enriched.mediaURLString == "https://static.exercisedb.dev/media/later.gif")
+        #expect(!enriched.isArchived)
+    }
+
     @Test("Custom rows do not win catalog name merges")
     func customRowsDoNotWinCatalogNameMerges() throws {
         let container = try TestFixtures.container()
@@ -392,7 +472,6 @@ private extension BundledExerciseCatalogTests {
         let suiteName = "RepTests.LegacyExerciseDBDataRemoval"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
-        defaults.set(true, forKey: "rep.exerciseCatalog.removedExerciseDBData.v1")
         return defaults
     }
 }

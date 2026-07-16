@@ -1,5 +1,34 @@
 import SwiftData
 import SwiftUI
+import UIKit
+import UniformTypeIdentifiers
+
+enum WorkoutKeyboardDestination: CaseIterable, Hashable, Identifiable {
+    case workout
+    case history
+    case routines
+    case settings
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .workout: "Workout"
+        case .history: "History"
+        case .routines: "Routines"
+        case .settings: "Settings"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .workout: "bolt.fill"
+        case .history: "clock.arrow.circlepath"
+        case .routines: "list.bullet.rectangle"
+        case .settings: "gearshape"
+        }
+    }
+}
 
 struct ActiveWorkoutView: View {
     @Environment(\.dismiss) private var dismiss
@@ -15,23 +44,31 @@ struct ActiveWorkoutView: View {
     @Query private var settings: [UserSettings]
 
     let session: WorkoutSession
+    let onKeyboardNavigate: (WorkoutKeyboardDestination) -> Void
     let onClose: () -> Void
 
     @State private var selectedExerciseID: UUID?
     @State private var restTimer: WorkoutRestTimerViewModel
     @State private var isShowingExercisePicker = false
-    @State private var isShowingExerciseOrder = false
-    @State private var replacementTarget: WorkoutExercise?
+    @State private var draggedExerciseID: UUID?
     @State private var detailExercise: Exercise?
     @State private var isShowingFinishConfirmation = false
     @State private var isShowingDiscardConfirmation = false
     @State private var isShowingRemoveExerciseConfirmation = false
+    @State private var exercisePendingRemoval: WorkoutExercise?
+    @State private var isShowingCompletion = false
     @State private var errorMessage: String?
     @State private var debouncedSaveTask: Task<Void, Never>?
 
-    init(session: WorkoutSession, onClose: @escaping () -> Void = {}) {
+    init(
+        session: WorkoutSession,
+        onKeyboardNavigate: @escaping (WorkoutKeyboardDestination) -> Void = { _ in },
+        onClose: @escaping () -> Void = {}
+    ) {
         self.session = session
+        self.onKeyboardNavigate = onKeyboardNavigate
         self.onClose = onClose
+        _selectedExerciseID = State(initialValue: Self.restoredSelection(for: session))
         _restTimer = State(initialValue: WorkoutRestTimerViewModel(sessionID: session.id))
     }
 
@@ -82,6 +119,8 @@ struct ActiveWorkoutView: View {
             }
             .animation(.snappy(duration: 0.25), value: restTimer.isPresented)
         }
+        .exerciseThumbnailScope()
+        .background(KeyboardDismissTapInstaller())
         .interactiveDismissDisabled(session.state == .active)
         .onAppear {
             if selectedExerciseID == nil {
@@ -95,12 +134,26 @@ struct ActiveWorkoutView: View {
             ActiveWorkoutRestTimerBridge.register {
                 restTimer.start(seconds: 5, nextExerciseName: "Development test")
             }
+            WorkoutLiveActivityWorkoutCoordinator.register(modelContext: modelContext) { exerciseID in
+                selectedExerciseID = exerciseID
+            }
+            synchronizeLiveActivity()
         }
         .onDisappear {
             ActiveWorkoutRestTimerBridge.unregister()
+            WorkoutLiveActivityWorkoutCoordinator.unregister()
+            debouncedSaveTask?.cancel()
+            persist()
         }
         .onChange(of: settings.first?.hapticsEnabled) { _, _ in
             updateRestTimerHapticsPreference()
+        }
+        .onChange(of: settings.first?.preferredWeightUnitRaw) { _, _ in
+            synchronizeLiveActivity()
+        }
+        .onChange(of: selectedExerciseID) { _, exerciseID in
+            rememberSelection(exerciseID)
+            synchronizeLiveActivity()
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
@@ -123,21 +176,8 @@ struct ActiveWorkoutView: View {
                 addExercise(exercise)
             }
         }
-        .sheet(item: $replacementTarget) { target in
-            WorkoutExercisePicker(
-                exercises: availableExercises.filter { $0.id != target.exercise?.id },
-                title: "Replace exercise"
-            ) { exercise in
-                replace(target, with: exercise)
-            }
-        }
         .sheet(item: $detailExercise) { exercise in
             ExerciseDetailView(exercise: exercise)
-        }
-        .sheet(isPresented: $isShowingExerciseOrder) {
-            WorkoutExerciseOrderEditor(session: session) {
-                persist()
-            }
         }
         .confirmationDialog(
             "Discard this workout?",
@@ -169,9 +209,14 @@ struct ActiveWorkoutView: View {
             titleVisibility: .visible
         ) {
             Button("Remove exercise", role: .destructive) {
-                if let currentExercise { removeExercise(currentExercise) }
+                if let exercisePendingRemoval {
+                    removeExercise(exercisePendingRemoval)
+                }
+                exercisePendingRemoval = nil
             }
-            Button("Cancel", role: .cancel) {}
+            Button("Cancel", role: .cancel) {
+                exercisePendingRemoval = nil
+            }
         }
         .alert("Couldn’t save the workout", isPresented: Binding(
             get: { errorMessage != nil },
@@ -182,6 +227,20 @@ struct ActiveWorkoutView: View {
             Text(errorMessage ?? "Your changes remain on screen. Please try again.")
         }
         .sensoryFeedback(.success, trigger: hapticsEnabled ? session.completedSetCount : 0)
+        .overlay {
+            if isShowingCompletion {
+                WorkoutCompletionView(
+                    session: session,
+                    preferredUnit: preferredUnit
+                ) {
+                    restTimer.endWorkout()
+                    onClose()
+                    dismiss()
+                }
+                .transition(.opacity.combined(with: .scale(scale: 0.98)))
+            }
+        }
+        .animation(.snappy(duration: 0.35), value: isShowingCompletion)
     }
 
     private func updateRestTimerHapticsPreference() {
@@ -191,25 +250,32 @@ struct ActiveWorkoutView: View {
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
-            Button("Close workout", systemImage: "chevron.down") {
+            Button {
+                dismissKeyboard()
                 persist()
                 onClose()
                 dismiss()
+            } label: {
+                Image(systemName: "chevron.down")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(width: 34, height: 34)
             }
-            .labelStyle(.iconOnly)
+            .buttonStyle(.plain)
+            .accessibilityLabel("Close workout")
             .accessibilityHint("Keeps the workout active so you can resume it later")
         }
 
         ToolbarItem(placement: .principal) {
             VStack(spacing: 1) {
                 Text(session.name)
-                    .font(.headline)
+                    .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
                 TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text(session.duration(at: context.date).formattedWorkoutDuration)
-                        .font(.caption.monospacedDigit())
-                        .repSecondaryText()
-                        .accessibilityLabel("Elapsed time \(session.duration(at: context.date).formattedWorkoutDuration)")
+                    let elapsed = session.duration(at: context.date)
+                    Text(formattedLiveElapsed(elapsed))
+                        .font(.body.monospacedDigit().weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .accessibilityLabel("Elapsed time \(formattedLiveElapsed(elapsed))")
                 }
             }
         }
@@ -239,212 +305,299 @@ struct ActiveWorkoutView: View {
             }
 
             Button("Finish") {
+                dismissKeyboard()
                 if shouldOfferDiscard {
                     isShowingDiscardConfirmation = true
                 } else {
                     isShowingFinishConfirmation = true
                 }
             }
-            .fontWeight(.semibold)
+            .font(.subheadline.weight(.semibold))
+            .controlSize(.small)
+        }
+
+        ToolbarItem(placement: .keyboard) {
+            HStack(spacing: 10) {
+                ForEach(WorkoutKeyboardDestination.allCases) { destination in
+                    Button {
+                        navigateFromKeyboard(to: destination)
+                    } label: {
+                        Image(systemName: destination.systemImage)
+                            .frame(width: 28, height: 28)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(destination == .workout ? Color.accentColor : .primary)
+                    .accessibilityLabel(destination.title)
+                    .accessibilityHint("Opens \(destination.title.lowercased())")
+                }
+
+                Spacer(minLength: 4)
+
+                Button("Done") { dismissKeyboard() }
+                    .fontWeight(.semibold)
+            }
+            .frame(maxWidth: .infinity)
         }
     }
 
     private var shouldOfferDiscard: Bool {
-        session.duration < 60 || session.exercises.isEmpty
+        session.completedSetCount == 0
     }
 
     private var discardWorkoutMessage: String {
         if session.exercises.isEmpty {
             return "You haven't added any exercises yet. Nothing will be saved to your history."
         }
-        return "This workout just started. Nothing will be saved to your history."
+        return "Complete at least one set before finishing. Nothing will be saved to your history."
+    }
+
+    private func formattedLiveElapsed(_ duration: TimeInterval) -> String {
+        let totalSeconds = max(0, Int(duration.rounded(.down)))
+        let hours = totalSeconds / 3_600
+        let minutes = (totalSeconds % 3_600) / 60
+        let seconds = totalSeconds % 60
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, seconds)
+        }
+        return String(format: "%d:%02d", minutes, seconds)
     }
 
     private func workoutContent(_ workoutExercise: WorkoutExercise) -> some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(spacing: 16) {
-                    exerciseNavigation
+        ScrollView {
+            LazyVStack(spacing: 8) {
+                exerciseNavigation
 
-                    currentExerciseHeader(workoutExercise)
-                    previousPerformance(for: workoutExercise)
-                    setsCard(workoutExercise, proxy: proxy)
+                currentExerciseHeader(workoutExercise)
+                previousPerformance(for: workoutExercise)
+                setsCard(workoutExercise)
 
-                    Button {
-                        addSet(to: workoutExercise)
-                    } label: {
-                        Label("Add set", systemImage: "plus")
-                            .frame(maxWidth: .infinity, minHeight: 48)
-                    }
-                    .repSecondaryButton()
-
-                    Button {
-                        isShowingExercisePicker = true
-                    } label: {
-                        Label("Add exercise", systemImage: "plus.circle")
-                            .frame(maxWidth: .infinity, minHeight: 48)
-                    }
-                    .buttonStyle(.plain)
-                    .repSecondaryText()
+                Button {
+                    dismissKeyboard()
+                    addSet(to: workoutExercise)
+                } label: {
+                    Label("Add set", systemImage: "plus")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
                 }
-                .padding(.horizontal)
-                .padding(.top, 10)
-                .padding(.bottom, 28)
+                .repSecondaryButton()
             }
-            .repSoftScrollEdges()
+            .padding(.horizontal)
+            .padding(.top, 6)
+            .padding(.bottom, 18)
         }
+        .contentMargins(.bottom, 16, for: .scrollContent)
+        .scrollDismissesKeyboard(.interactively)
+        .repSoftScrollEdges()
     }
 
     private var exerciseNavigation: some View {
         ScrollView(.horizontal) {
-            RepGlassEffectGroup(spacing: 8) {
-                HStack(spacing: 8) {
-                    ForEach(orderedExercises) { workoutExercise in
+            HStack(spacing: 8) {
+                ForEach(orderedExercises) { workoutExercise in
                     let isSelected = workoutExercise.id == currentExercise?.id
                     let completeCount = workoutExercise.sets.filter(\.isCompleted).count
                     let isComplete = !workoutExercise.sets.isEmpty && completeCount == workoutExercise.sets.count
 
                     Button {
+                        dismissKeyboard()
                         withAnimation(.easeOut(duration: 0.18)) {
                             selectedExerciseID = workoutExercise.id
                         }
                     } label: {
-                        HStack(spacing: 8) {
-                            if isComplete {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(isSelected ? .white : .green)
-                                    .imageScale(.small)
-                            }
-
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(workoutExercise.exercise?.name ?? "Exercise")
-                                    .font(.subheadline.weight(.semibold))
-                                    .lineLimit(1)
-                                Text(workoutExercise.isSkipped ? "Skipped" : isComplete ? "Complete" : "\(completeCount)/\(workoutExercise.sets.count) sets")
-                                    .font(.caption2)
-                                    .foregroundStyle(isSelected ? Color.white.opacity(0.82) : .secondary)
-                            }
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .frame(minHeight: 44)
-                        .foregroundStyle(isSelected ? .white : .primary)
-                        .contentShape(.capsule)
-                        .repGlassControl(
-                            tint: isSelected ? RepVisualSystem.tint : (isComplete ? Color.green.opacity(0.12) : nil),
-                            cornerRadius: 99
+                        exerciseNavigationPill(
+                            workoutExercise,
+                            isSelected: isSelected,
+                            isComplete: isComplete,
+                            completeCount: completeCount
                         )
                     }
                     .buttonStyle(.plain)
+                    .contentShape(.dragPreview, Capsule())
+                    .onDrag {
+                        dismissKeyboard()
+                        if hapticsEnabled {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred(intensity: 0.7)
+                        }
+                        draggedExerciseID = workoutExercise.id
+                        return NSItemProvider(object: workoutExercise.id.uuidString as NSString)
+                    } preview: {
+                        exerciseNavigationPill(
+                            workoutExercise,
+                            isSelected: isSelected,
+                            isComplete: isComplete,
+                            completeCount: completeCount
+                        )
+                        .contentShape(.dragPreview, Capsule())
+                    }
+                    .onDrop(
+                        of: [UTType.text],
+                        delegate: WorkoutExerciseDropDelegate(
+                            targetID: workoutExercise.id,
+                            draggedID: $draggedExerciseID,
+                            onMove: moveExercise,
+                            onDrop: persist
+                        )
+                    )
+                    .contextMenu {
+                        Button("Remove exercise", systemImage: "trash", role: .destructive) {
+                            exercisePendingRemoval = workoutExercise
+                            isShowingRemoveExerciseConfirmation = true
+                        }
+                    }
                     .accessibilityLabel("\(workoutExercise.exercise?.name ?? "Exercise"), \(isComplete ? "complete" : "\(completeCount) of \(workoutExercise.sets.count) sets complete")")
+                    .accessibilityHint("Press and hold for options, or drag to reorder")
                     .accessibilityAddTraits(isSelected ? .isSelected : [])
                 }
 
-                    Button("Reorder exercises", systemImage: "arrow.up.arrow.down") {
-                        isShowingExerciseOrder = true
-                    }
-                    .labelStyle(.iconOnly)
-                    .frame(width: 44, height: 44)
-                    .repGlassControl(cornerRadius: 99)
+                Button {
+                    dismissKeyboard()
+                    isShowingExercisePicker = true
+                } label: {
+                    Label("Add", systemImage: "plus")
+                        .font(.system(size: 13, weight: .semibold))
+                        .padding(.horizontal, 13)
+                        .frame(height: 44)
+                        .contentShape(Capsule())
                 }
+                .buttonStyle(.plain)
+                .repGlassControl(cornerRadius: 99)
+                .accessibilityLabel("Add exercise")
+                .accessibilityHint("Adds an exercise after the current exercise")
             }
+            .padding(.horizontal, 4)
+            .padding(.vertical, 8)
         }
         .scrollIndicators(.hidden)
-        .contentMargins(.horizontal, 1, for: .scrollContent)
+    }
+
+    private func exerciseNavigationPill(
+        _ workoutExercise: WorkoutExercise,
+        isSelected: Bool,
+        isComplete: Bool,
+        completeCount: Int
+    ) -> some View {
+        HStack(spacing: 8) {
+            if isComplete {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(isSelected ? .white : .green)
+                    .imageScale(.small)
+            }
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(workoutExercise.exercise?.name ?? "Exercise")
+                    .font(.system(size: 13, weight: .semibold))
+                    .lineLimit(1)
+                Text(isComplete ? "Complete" : "\(completeCount)/\(workoutExercise.sets.count) sets")
+                    .font(.caption2)
+                    .foregroundStyle(isSelected ? Color.white.opacity(0.82) : .secondary)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .frame(minHeight: 44)
+        .fixedSize(horizontal: true, vertical: false)
+        .frame(minWidth: 112)
+        .foregroundStyle(isSelected ? .white : .primary)
+        .contentShape(.capsule)
+        .repGlassControl(
+            tint: isSelected ? RepVisualSystem.tint : (isComplete ? Color.green.opacity(0.12) : nil),
+            cornerRadius: 99
+        )
     }
 
     private func currentExerciseHeader(_ workoutExercise: WorkoutExercise) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
+        HStack(alignment: .center, spacing: 12) {
+            if let exercise = workoutExercise.exercise {
+                Button {
+                    dismissKeyboard()
+                    detailExercise = exercise
+                } label: {
+                    ExerciseMediaThumbnail(exercise: exercise, size: 56, listIndex: 0)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("View instructions for \(exercise.name)")
+                .accessibilityHint("Opens the exercise demonstration and instructions")
+            }
+
             VStack(alignment: .leading, spacing: 3) {
                 Text(workoutExercise.exercise?.name ?? "Unavailable exercise")
-                    .font(.title2.bold())
+                    .font(.title3.bold())
+                    .lineLimit(2)
                 if let exercise = workoutExercise.exercise {
                     Text("\(exercise.primaryMuscleGroup.displayName) · \(exercise.equipment.displayName)")
                         .font(.subheadline)
                         .repSecondaryText()
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(1)
 
-            Spacer()
-
-            if let exercise = workoutExercise.exercise {
-                Button {
-                    detailExercise = exercise
-                } label: {
-                    Label("Details", systemImage: "info.circle")
-                        .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, 12)
-                        .frame(minHeight: 44)
-                        .repGlassControl(cornerRadius: 99)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("View details for \(exercise.name)")
-                .accessibilityHint("Opens exercise details and any saved instructions")
-            }
-
-            Menu("Exercise options", systemImage: "ellipsis.circle") {
-                if let exercise = workoutExercise.exercise {
-                    Button("View exercise details", systemImage: "info.circle") {
-                        detailExercise = exercise
-                    }
-                    Divider()
-                }
-                Button("Replace for this workout", systemImage: "arrow.triangle.2.circlepath") {
-                    replacementTarget = workoutExercise
-                }
-                Button(workoutExercise.isSkipped ? "Unskip exercise" : "Skip for now", systemImage: "forward") {
-                    workoutExercise.isSkipped.toggle()
-                    persist()
-                    if workoutExercise.isSkipped { selectNextExercise(after: workoutExercise) }
-                }
-                Button("Reorder exercises", systemImage: "arrow.up.arrow.down") {
-                    isShowingExerciseOrder = true
-                }
-                Divider()
+            Menu {
                 Button("Remove exercise", systemImage: "trash", role: .destructive) {
+                    dismissKeyboard()
+                    exercisePendingRemoval = workoutExercise
                     isShowingRemoveExerciseConfirmation = true
                 }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .font(.body.weight(.semibold))
+                    .frame(width: 32, height: 32)
             }
-            .labelStyle(.iconOnly)
-            .font(.title3)
-            .frame(width: 44, height: 44)
-            .repGlassControl(cornerRadius: 99)
+            .buttonStyle(.plain)
+            .accessibilityLabel("Exercise options")
         }
     }
 
     @ViewBuilder
     private func previousPerformance(for workoutExercise: WorkoutExercise) -> some View {
         if let previous = previousWorkoutExercise(for: workoutExercise) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Previous")
+            let completedSets = previous.exercise.orderedSets.filter(\.isCompleted)
+
+            HStack(spacing: 10) {
+                Text(previous.date, format: .dateTime.month(.abbreviated).day().year())
                     .font(.caption.weight(.semibold))
                     .repSecondaryText()
-                    .textCase(.uppercase)
+                    .fixedSize(horizontal: true, vertical: false)
 
-                let completedSets = previous.exercise.orderedSets.filter(\.isCompleted)
                 if completedSets.isEmpty {
                     Text("No completed sets")
-                        .font(.subheadline)
+                        .font(.caption)
                         .repSecondaryText()
                 } else {
-                    Text(completedSets.map(shortSetDescription).joined(separator: "  ·  "))
-                        .font(.subheadline.monospacedDigit())
-                        .repSecondaryText()
-                        .fixedSize(horizontal: false, vertical: true)
+                    ScrollView(.horizontal) {
+                        LazyHGrid(
+                            rows: [
+                                GridItem(.fixed(18), spacing: 3),
+                                GridItem(.fixed(18), spacing: 3)
+                            ],
+                            spacing: 7
+                        ) {
+                            ForEach(Array(completedSets.enumerated()), id: \.element.id) { index, set in
+                                HStack(spacing: 3) {
+                                    Text("\(index + 1):")
+                                        .foregroundStyle(.secondary)
+                                    Text(shortSetDescription(set))
+                                        .foregroundStyle(.primary)
+                                }
+                                .font(.caption.monospacedDigit().weight(.medium))
+                                .fixedSize(horizontal: true, vertical: false)
+                            }
+                        }
+                        .frame(height: 39)
+                    }
+                    .scrollIndicators(.hidden)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-
-                Text(previous.date, format: .dateTime.month(.abbreviated).day().year())
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding()
-            .repSurface(cornerRadius: RepVisualSystem.controlRadius)
-            .accessibilityElement(children: .combine)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 3)
+            .overlay(alignment: .bottom) { Divider() }
         }
     }
 
-    private func setsCard(_ workoutExercise: WorkoutExercise, proxy: ScrollViewProxy) -> some View {
+    private func setsCard(_ workoutExercise: WorkoutExercise) -> some View {
         VStack(spacing: 0) {
             SetColumnHeader(
                 measurementType: workoutExercise.exercise?.measurementType ?? .weightAndRepetitions,
@@ -460,20 +613,16 @@ struct ActiveWorkoutView: View {
                 .padding(.vertical, 20)
             } else {
                 ForEach(workoutExercise.orderedSets) { set in
-                    Divider().padding(.leading, 42)
+                    Divider().padding(.leading, 38)
                     ActiveWorkoutSetRow(
                         set: set,
                         measurementType: workoutExercise.exercise?.measurementType ?? .weightAndRepetitions,
                         preferredUnit: preferredUnit,
+                        weightStep: weightStep(for: workoutExercise.exercise),
                         onEdit: schedulePersist,
                         onToggleCompletion: {
+                            dismissKeyboard()
                             toggleCompletion(of: set, in: workoutExercise)
-                            if set.isCompleted,
-                               let nextSet = workoutExercise.orderedSets.first(where: { !$0.isCompleted }) {
-                                withAnimation(.easeOut(duration: 0.2)) {
-                                    proxy.scrollTo(nextSet.id, anchor: .center)
-                                }
-                            }
                         },
                         onDelete: { removeSet(set, from: workoutExercise) }
                     )
@@ -481,8 +630,13 @@ struct ActiveWorkoutView: View {
                 }
             }
         }
-        .repSurface(cornerRadius: RepVisualSystem.cardRadius)
-        .clipShape(.rect(cornerRadius: RepVisualSystem.cardRadius))
+        .repSurface(cornerRadius: 14, shadowRadius: 3, shadowY: 1)
+        .clipShape(.rect(cornerRadius: 14))
+    }
+
+    private func weightStep(for exercise: Exercise?) -> Double {
+        guard exercise?.primaryMuscleGroup == .shoulders else { return 5 }
+        return preferredUnit == .kilograms ? 1 : 2.5
     }
 
     private var emptyWorkout: some View {
@@ -497,10 +651,19 @@ struct ActiveWorkoutView: View {
     }
 
     private func addExercise(_ exercise: Exercise) {
+        let insertionIndex = currentExercise
+            .flatMap { current in orderedExercises.firstIndex(where: { $0.id == current.id }) }
+            .map { $0 + 1 }
+            ?? orderedExercises.count
+
+        for existingExercise in orderedExercises where existingExercise.orderIndex >= insertionIndex {
+            existingExercise.orderIndex += 1
+        }
+
         let set = WorkoutSet(orderIndex: 0)
         let workoutExercise = WorkoutExercise(
             exercise: exercise,
-            orderIndex: session.exercises.count,
+            orderIndex: insertionIndex,
             defaultRestSeconds: defaultRestSeconds,
             sets: [set]
         )
@@ -511,19 +674,40 @@ struct ActiveWorkoutView: View {
         persist()
     }
 
-    private func replace(_ workoutExercise: WorkoutExercise, with exercise: Exercise) {
-        workoutExercise.substitutionForExerciseID = workoutExercise.exercise?.id
-        workoutExercise.exercise = exercise
+    private func moveExercise(_ draggedID: UUID, over targetID: UUID) {
+        guard draggedID != targetID else { return }
+
+        var reordered = orderedExercises
+        guard let sourceIndex = reordered.firstIndex(where: { $0.id == draggedID }),
+              let targetIndex = reordered.firstIndex(where: { $0.id == targetID }) else { return }
+
+        withAnimation(.snappy(duration: 0.2)) {
+            reordered.move(
+                fromOffsets: IndexSet(integer: sourceIndex),
+                toOffset: targetIndex > sourceIndex ? targetIndex + 1 : targetIndex
+            )
+            for (index, exercise) in reordered.enumerated() {
+                exercise.orderIndex = index
+            }
+            session.exercises = reordered
+        }
+        if hapticsEnabled {
+            UISelectionFeedbackGenerator().selectionChanged()
+        }
         session.updatedAt = .now
-        persist()
+        schedulePersist()
     }
 
     private func removeExercise(_ workoutExercise: WorkoutExercise) {
+        let removedIndex = orderedExercises.firstIndex { $0.id == workoutExercise.id } ?? 0
         session.exercises.removeAll { $0.id == workoutExercise.id }
         session.normalizeExerciseOrder()
         session.updatedAt = .now
         modelContext.delete(workoutExercise)
-        selectedExerciseID = session.orderedExercises.first?.id
+        let remainingExercises = session.orderedExercises
+        selectedExerciseID = remainingExercises.isEmpty
+            ? nil
+            : remainingExercises[min(removedIndex, remainingExercises.count - 1)].id
         persist()
     }
 
@@ -557,6 +741,11 @@ struct ActiveWorkoutView: View {
             set.reopen()
         } else {
             set.markCompleted()
+            WorkoutLiveActivityWorkoutCoordinator.advanceAfterCompletion(
+                session: session,
+                completedSetID: set.id,
+                preferredUnit: preferredUnit
+            )
             let restSeconds = workoutExercise.defaultRestSeconds ?? defaultRestSeconds
             if restSeconds > 0 {
                 restTimer.start(
@@ -580,19 +769,12 @@ struct ActiveWorkoutView: View {
         }
 
         let upcoming = orderedExercises.suffix(from: min(index + 1, orderedExercises.endIndex))
-        if let nextExercise = upcoming.first(where: { !$0.isSkipped }) {
+        if let nextExercise = upcoming.first {
             return nextExercise.exercise?.name ?? "Next exercise"
         }
 
-        return orderedExercises.first(where: { !$0.isSkipped })?.exercise?.name ?? "Next exercise"
-    }
-
-    private func selectNextExercise(after workoutExercise: WorkoutExercise) {
-        guard let index = orderedExercises.firstIndex(where: { $0.id == workoutExercise.id }) else { return }
-        let remaining = orderedExercises.suffix(from: min(index + 1, orderedExercises.endIndex))
-        selectedExerciseID = remaining.first(where: { !$0.isSkipped })?.id
-            ?? orderedExercises.first(where: { !$0.isSkipped })?.id
-            ?? workoutExercise.id
+        let exerciseName = workoutExercise.exercise?.name ?? "Exercise"
+        return "\(exerciseName) · Another set"
     }
 
     private func previousWorkoutExercise(for workoutExercise: WorkoutExercise) -> (exercise: WorkoutExercise, date: Date)? {
@@ -612,7 +794,7 @@ struct ActiveWorkoutView: View {
     private func shortSetDescription(_ set: WorkoutSet) -> String {
         if let weight = set.weight, let repetitions = set.repetitions {
             let displayed = UnitConversion.weight(weight, from: .kilograms, to: preferredUnit)
-            return "\(displayed.formatted(.number.precision(.fractionLength(0...2)))) × \(repetitions)"
+            return "\(displayed.formatted(.number.precision(.fractionLength(0...2))))×\(repetitions)"
         }
         if let repetitions = set.repetitions { return "\(repetitions) reps" }
         if let duration = set.durationSeconds { return "\(duration)s" }
@@ -623,9 +805,9 @@ struct ActiveWorkoutView: View {
     private func finishWorkout() {
         do {
             try WorkoutService(context: modelContext).finish(session)
-            restTimer.skip()
-            onClose()
-            dismiss()
+            clearRememberedSelection()
+            restTimer.endWorkout()
+            isShowingCompletion = true
         } catch {
             AppLog.persistenceFailure(operation: "Finish workout", error: error)
             errorMessage = error.localizedDescription
@@ -635,7 +817,8 @@ struct ActiveWorkoutView: View {
     private func discardWorkout() {
         do {
             try WorkoutService(context: modelContext).abandon(session)
-            restTimer.skip()
+            clearRememberedSelection()
+            restTimer.endWorkout()
             onClose()
             dismiss()
         } catch {
@@ -647,7 +830,7 @@ struct ActiveWorkoutView: View {
     private func schedulePersist() {
         debouncedSaveTask?.cancel()
         debouncedSaveTask = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(250))
+            try? await Task.sleep(for: .milliseconds(120))
             guard !Task.isCancelled else { return }
             persist()
         }
@@ -656,9 +839,157 @@ struct ActiveWorkoutView: View {
     private func persist() {
         do {
             try modelContext.save()
+            synchronizeLiveActivity()
         } catch {
             AppLog.persistenceFailure(operation: "Save active workout", error: error)
             errorMessage = error.localizedDescription
+        }
+    }
+
+    private static func selectionStorageKey(for sessionID: UUID) -> String {
+        "active-workout-selection-\(sessionID.uuidString)"
+    }
+
+    private static func restoredSelection(for session: WorkoutSession) -> UUID? {
+        let key = selectionStorageKey(for: session.id)
+        guard let storedValue = UserDefaults.standard.string(forKey: key),
+              let storedID = UUID(uuidString: storedValue),
+              session.orderedExercises.contains(where: { $0.id == storedID }) else {
+            return session.orderedExercises.first?.id
+        }
+        return storedID
+    }
+
+    private func rememberSelection(_ exerciseID: UUID?) {
+        let key = Self.selectionStorageKey(for: session.id)
+        if let exerciseID {
+            UserDefaults.standard.set(exerciseID.uuidString, forKey: key)
+        } else {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+    }
+
+    private func clearRememberedSelection() {
+        UserDefaults.standard.removeObject(forKey: Self.selectionStorageKey(for: session.id))
+    }
+
+    private func synchronizeLiveActivity() {
+        WorkoutLiveActivityWorkoutCoordinator.synchronize(
+            session: session,
+            selectedExerciseID: selectedExerciseID,
+            preferredUnit: preferredUnit
+        )
+    }
+
+    private func dismissKeyboard() {
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+        )
+    }
+
+    private func navigateFromKeyboard(to destination: WorkoutKeyboardDestination) {
+        dismissKeyboard()
+        debouncedSaveTask?.cancel()
+        persist()
+        onKeyboardNavigate(destination)
+    }
+}
+
+private struct WorkoutExerciseDropDelegate: DropDelegate {
+    let targetID: UUID
+    @Binding var draggedID: UUID?
+    let onMove: (UUID, UUID) -> Void
+    let onDrop: () -> Void
+
+    func dropEntered(info: DropInfo) {
+        guard let draggedID, draggedID != targetID else { return }
+        onMove(draggedID, targetID)
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        draggedID = nil
+        onDrop()
+        return true
+    }
+}
+
+private struct KeyboardDismissTapInstaller: UIViewRepresentable {
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    func makeUIView(context: Context) -> WindowReaderView {
+        let view = WindowReaderView()
+        view.isUserInteractionEnabled = false
+        view.onWindowChange = { [weak coordinator = context.coordinator] window in
+            coordinator?.install(in: window)
+        }
+        return view
+    }
+
+    func updateUIView(_ uiView: WindowReaderView, context: Context) {
+        context.coordinator.install(in: uiView.window)
+    }
+
+    static func dismantleUIView(_ uiView: WindowReaderView, coordinator: Coordinator) {
+        coordinator.uninstall()
+    }
+
+    final class WindowReaderView: UIView {
+        var onWindowChange: ((UIWindow?) -> Void)?
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            onWindowChange?(window)
+        }
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        private weak var installedWindow: UIWindow?
+        private lazy var tapRecognizer: UITapGestureRecognizer = {
+            let recognizer = UITapGestureRecognizer(target: self, action: #selector(handleTap))
+            recognizer.cancelsTouchesInView = false
+            recognizer.delegate = self
+            return recognizer
+        }()
+
+        func install(in window: UIWindow?) {
+            guard installedWindow !== window else { return }
+            uninstall()
+            installedWindow = window
+            window?.addGestureRecognizer(tapRecognizer)
+        }
+
+        func uninstall() {
+            installedWindow?.removeGestureRecognizer(tapRecognizer)
+            installedWindow = nil
+        }
+
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+            var touchedView = touch.view
+            while let view = touchedView {
+                if view is UITextField || view is UITextView {
+                    return false
+                }
+                touchedView = view.superview
+            }
+            return true
+        }
+
+        @objc private func handleTap() {
+            UIApplication.shared.sendAction(
+                #selector(UIResponder.resignFirstResponder),
+                to: nil,
+                from: nil,
+                for: nil
+            )
         }
     }
 }
@@ -670,7 +1001,7 @@ private struct SetColumnHeader: View {
     var body: some View {
         HStack(spacing: 8) {
             Text("Set")
-                .frame(width: 34)
+                .frame(width: 30)
             Group {
                 switch measurementType {
                 case .weightAndRepetitions, .bodyweightPlusAddedWeight, .custom:
@@ -691,12 +1022,12 @@ private struct SetColumnHeader: View {
                     Text("Reps").frame(maxWidth: .infinity)
                 }
             }
-            Color.clear.frame(width: 48, height: 1)
+            Color.clear.frame(width: 42, height: 1)
         }
         .font(.caption.weight(.semibold))
         .repSecondaryText()
-        .padding(.horizontal, 10)
-        .padding(.vertical, 9)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
         .accessibilityHidden(true)
     }
 }
@@ -705,12 +1036,13 @@ private struct ActiveWorkoutSetRow: View {
     @Bindable var set: WorkoutSet
     let measurementType: MeasurementType
     let preferredUnit: WeightUnit
+    let weightStep: Double
     let onEdit: () -> Void
     let onToggleCompletion: () -> Void
     let onDelete: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Menu {
                 Picker("Set type", selection: $set.setTypeRaw) {
                     ForEach(WorkoutSetType.allCases) { type in
@@ -720,7 +1052,7 @@ private struct ActiveWorkoutSetRow: View {
             } label: {
                 Text("\(set.orderIndex + 1)")
                     .font(.subheadline.monospacedDigit().weight(.semibold))
-                    .frame(width: 34, height: 44)
+                    .frame(width: 30, height: 42)
                     .background(set.setType == .working ? Color.clear : Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
             }
             .foregroundStyle(.primary)
@@ -731,22 +1063,31 @@ private struct ActiveWorkoutSetRow: View {
             Button(action: onToggleCompletion) {
                 ZStack {
                     Circle()
-                        .fill(set.isCompleted ? RepVisualSystem.tint : Color.primary.opacity(0.075))
-                        .frame(width: 38, height: 38)
-                    Image(systemName: set.isCompleted ? "checkmark" : "circle")
-                        .font(.body.weight(.bold))
-                        .foregroundStyle(set.isCompleted ? .white : .secondary)
-                        .contentTransition(.symbolEffect(.replace))
+                        .fill(set.isCompleted ? RepVisualSystem.tint : Color.clear)
+                        .overlay {
+                            Circle()
+                                .strokeBorder(
+                                    set.isCompleted ? Color.clear : Color.accentColor.opacity(0.72),
+                                    lineWidth: 2
+                                )
+                        }
+                        .frame(width: 30, height: 30)
+                    if set.isCompleted {
+                        Image(systemName: "checkmark")
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(.white)
+                            .contentTransition(.symbolEffect(.replace))
+                    }
                 }
-                .frame(width: 48, height: 48)
+                .frame(width: 42, height: 42)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(set.isCompleted ? "Reopen set \(set.orderIndex + 1)" : "Complete set \(set.orderIndex + 1)")
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .background(set.isCompleted ? RepVisualSystem.tint.opacity(0.045) : .clear)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 2)
+        .background(set.isCompleted ? RepVisualSystem.tint.opacity(0.07) : .clear)
         .swipeActions(edge: .trailing) {
             Button("Delete", systemImage: "trash", role: .destructive, action: onDelete)
         }
@@ -760,20 +1101,20 @@ private struct ActiveWorkoutSetRow: View {
     private var metricFields: some View {
         switch measurementType {
         case .weightAndRepetitions, .bodyweightPlusAddedWeight, .custom:
-            OptionalWeightField(title: "Weight", kilograms: $set.weight, preferredUnit: preferredUnit, onCommit: touchAndSave)
+            OptionalWeightField(title: "Weight", kilograms: $set.weight, preferredUnit: preferredUnit, step: weightStep, onCommit: touchAndSave)
             OptionalIntField(title: "Repetitions", value: $set.repetitions, onCommit: touchAndSave)
         case .repetitionsOnly, .bodyweightAndRepetitions:
             OptionalIntField(title: "Repetitions", value: $set.repetitions, onCommit: touchAndSave)
         case .duration:
             OptionalIntField(title: "Duration in seconds", value: $set.durationSeconds, onCommit: touchAndSave)
         case .weightAndDuration:
-            OptionalWeightField(title: "Weight", kilograms: $set.weight, preferredUnit: preferredUnit, onCommit: touchAndSave)
+            OptionalWeightField(title: "Weight", kilograms: $set.weight, preferredUnit: preferredUnit, step: weightStep, onCommit: touchAndSave)
             OptionalIntField(title: "Duration in seconds", value: $set.durationSeconds, onCommit: touchAndSave)
         case .distanceAndDuration:
             OptionalDoubleField(title: "Distance in meters", value: $set.distance, onCommit: touchAndSave)
             OptionalIntField(title: "Duration in seconds", value: $set.durationSeconds, onCommit: touchAndSave)
         case .assistedBodyweight:
-            OptionalWeightField(title: "Assistance weight", kilograms: $set.assistanceWeight, preferredUnit: preferredUnit, onCommit: touchAndSave)
+            OptionalWeightField(title: "Assistance weight", kilograms: $set.assistanceWeight, preferredUnit: preferredUnit, step: weightStep, onCommit: touchAndSave)
             OptionalIntField(title: "Repetitions", value: $set.repetitions, onCommit: touchAndSave)
         }
     }
@@ -797,14 +1138,19 @@ private struct OptionalDoubleField: View {
             .keyboardType(.decimalPad)
             .multilineTextAlignment(.center)
             .font(.body.monospacedDigit().weight(.medium))
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 9))
+            .frame(maxWidth: .infinity)
+            .frame(height: 42)
+            .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 8))
             .accessibilityLabel(title)
             .focused($isFocused)
             .onAppear { syncFromValue() }
             .onChange(of: value) { _, _ in
                 guard !isFocused else { return }
                 syncFromValue()
+            }
+            .onChange(of: text) { _, text in
+                guard isFocused else { return }
+                updateValueWhileTyping(text)
             }
             .onChange(of: isFocused) { _, focused in
                 if !focused { commit() }
@@ -829,11 +1175,7 @@ private struct OptionalDoubleField: View {
             return
         }
 
-        let formatter = NumberFormatter()
-        formatter.locale = .current
-        formatter.numberStyle = .decimal
-        let number = formatter.number(from: trimmed) ?? Double(trimmed.replacingOccurrences(of: ",", with: ".")) as NSNumber?
-        guard let parsed = number?.doubleValue, parsed.isFinite else {
+        guard let parsed = parsedLocalizedDecimal(trimmed), parsed.isFinite else {
             syncFromValue()
             return
         }
@@ -843,15 +1185,24 @@ private struct OptionalDoubleField: View {
             onCommit()
         }
     }
+
+    private func updateValueWhileTyping(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let parsed = parsedLocalizedDecimal(trimmed),
+              parsed.isFinite,
+              value != parsed else { return }
+        value = parsed
+        onCommit()
+    }
 }
 
 private struct OptionalWeightField: View {
     let title: String
     @Binding var kilograms: Double?
     let preferredUnit: WeightUnit
+    let step: Double
     let onCommit: () -> Void
-
-    private var weightStep: Double { 5 }
 
     @FocusState private var isFocused: Bool
     @State private var text: String = ""
@@ -862,8 +1213,9 @@ private struct OptionalWeightField: View {
                 .keyboardType(.decimalPad)
                 .multilineTextAlignment(.center)
                 .font(.body.monospacedDigit().weight(.medium))
-                .padding(.horizontal, 34)
-                .frame(maxWidth: .infinity, minHeight: 44)
+                .padding(.horizontal, 29)
+                .frame(maxWidth: .infinity)
+                .frame(height: 42)
                 .accessibilityLabel("\(title) in \(preferredUnit.displayName.lowercased())")
                 .focused($isFocused)
                 .onAppear { syncFromValue() }
@@ -871,21 +1223,25 @@ private struct OptionalWeightField: View {
                     guard !isFocused else { return }
                     syncFromValue()
                 }
+                .onChange(of: text) { _, text in
+                    guard isFocused else { return }
+                    updateValueWhileTyping(text)
+                }
                 .onChange(of: isFocused) { _, focused in
                     if !focused { commit() }
                 }
 
             HStack(spacing: 0) {
                 RepeatStepButton(systemImage: "minus", accessibilityLabel: "Decrease \(title.lowercased())") {
-                    adjustWeight(by: -weightStep)
+                    adjustWeight(by: -step)
                 }
                 Spacer(minLength: 0)
                 RepeatStepButton(systemImage: "plus", accessibilityLabel: "Increase \(title.lowercased())") {
-                    adjustWeight(by: weightStep)
+                    adjustWeight(by: step)
                 }
             }
         }
-        .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 9))
+        .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 8))
     }
 
     private func adjustWeight(by displayDelta: Double) {
@@ -925,11 +1281,9 @@ private struct OptionalWeightField: View {
             return
         }
 
-        let formatter = NumberFormatter()
-        formatter.locale = .current
-        formatter.numberStyle = .decimal
-        let number = formatter.number(from: trimmed) ?? Double(trimmed.replacingOccurrences(of: ",", with: ".")) as NSNumber?
-        guard let parsedDisplay = number?.doubleValue, parsedDisplay.isFinite else {
+        guard let parsedDisplay = parsedLocalizedDecimal(trimmed),
+              parsedDisplay.isFinite,
+              parsedDisplay >= 0 else {
             syncFromValue()
             return
         }
@@ -939,6 +1293,19 @@ private struct OptionalWeightField: View {
             kilograms = newKilograms
             onCommit()
         }
+    }
+
+    private func updateValueWhileTyping(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let parsedDisplay = parsedLocalizedDecimal(trimmed),
+              parsedDisplay.isFinite,
+              parsedDisplay >= 0 else { return }
+
+        let newKilograms = UnitConversion.weight(parsedDisplay, from: preferredUnit, to: .kilograms)
+        guard kilograms != newKilograms else { return }
+        kilograms = newKilograms
+        onCommit()
     }
 }
 
@@ -957,14 +1324,19 @@ private struct OptionalIntField: View {
                 .keyboardType(.numberPad)
                 .multilineTextAlignment(.center)
                 .font(.body.monospacedDigit().weight(.medium))
-                .padding(.horizontal, 34)
-                .frame(maxWidth: .infinity, minHeight: 44)
+                .padding(.horizontal, 29)
+                .frame(maxWidth: .infinity)
+                .frame(height: 42)
                 .accessibilityLabel(title)
                 .focused($isFocused)
                 .onAppear { syncFromValue() }
                 .onChange(of: value) { _, _ in
                     guard !isFocused else { return }
                     syncFromValue()
+                }
+                .onChange(of: text) { _, text in
+                    guard isFocused else { return }
+                    updateValueWhileTyping(text)
                 }
                 .onChange(of: isFocused) { _, focused in
                     if !focused { commit() }
@@ -980,7 +1352,7 @@ private struct OptionalIntField: View {
                 }
             }
         }
-        .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 9))
+        .background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 8))
     }
 
     private func adjust(by delta: Int) {
@@ -1025,6 +1397,33 @@ private struct OptionalIntField: View {
             onCommit()
         }
     }
+
+    private func updateValueWhileTyping(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let parsed = Int(trimmed),
+              parsed >= 0 else { return }
+        let newValue = parsed == 0 ? nil : parsed
+        guard value != newValue else { return }
+        value = newValue
+        onCommit()
+    }
+}
+
+private func parsedLocalizedDecimal(_ text: String) -> Double? {
+    var normalized = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !normalized.isEmpty else { return nil }
+
+    let locale = Locale.current
+    if let groupingSeparator = locale.groupingSeparator, !groupingSeparator.isEmpty {
+        normalized = normalized.replacingOccurrences(of: groupingSeparator, with: "")
+    }
+    if let decimalSeparator = locale.decimalSeparator,
+       !decimalSeparator.isEmpty,
+       decimalSeparator != "." {
+        normalized = normalized.replacingOccurrences(of: decimalSeparator, with: ".")
+    }
+    return Double(normalized)
 }
 
 private struct WorkoutExercisePicker: View {
@@ -1055,46 +1454,6 @@ private struct WorkoutExercisePicker: View {
                     Button("New Exercise", systemImage: "plus") {
                         isCreatingExercise = true
                     }
-                }
-            }
-        }
-    }
-}
-
-private struct WorkoutExerciseOrderEditor: View {
-    @Environment(\.dismiss) private var dismiss
-    let session: WorkoutSession
-    let onChange: () -> Void
-
-    @State private var orderedExercises: [WorkoutExercise]
-
-    init(session: WorkoutSession, onChange: @escaping () -> Void) {
-        self.session = session
-        self.onChange = onChange
-        _orderedExercises = State(initialValue: session.orderedExercises)
-    }
-
-    var body: some View {
-        NavigationStack {
-            List {
-                ForEach(orderedExercises) { workoutExercise in
-                    Label(workoutExercise.exercise?.name ?? "Unavailable exercise", systemImage: "line.3.horizontal")
-                }
-                .onMove { source, destination in
-                    orderedExercises.move(fromOffsets: source, toOffset: destination)
-                    for (index, workoutExercise) in orderedExercises.enumerated() {
-                        workoutExercise.orderIndex = index
-                    }
-                    session.updatedAt = .now
-                    onChange()
-                }
-            }
-            .environment(\.editMode, .constant(.active))
-            .navigationTitle("Exercise order")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
                 }
             }
         }

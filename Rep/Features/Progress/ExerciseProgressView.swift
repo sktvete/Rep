@@ -34,12 +34,13 @@ struct ExerciseProgressView: View {
             return []
         case .bodyweight:
             return bodyweightEntries
-                .filter { timeRange.includes($0.measuredAt) }
-                .map {
-                    ExerciseProgressComparisonPoint(
+                .compactMap {
+                    guard timeRange.includes($0.measuredAt),
+                          let value = validDisplayWeight($0.weightKilograms) else { return nil }
+                    return ExerciseProgressComparisonPoint(
                         id: $0.id,
                         date: $0.measuredAt,
-                        value: displayWeight($0.weightKilograms)
+                        value: value
                     )
                 }
         case .sessionLength:
@@ -52,7 +53,7 @@ struct ExerciseProgressView: View {
                 }
                 guard includesExercise, timeRange.includes(date) else { return nil }
                 let minutes = session.duration(at: date) / 60
-                guard minutes > 0 else { return nil }
+                guard minutes.isFinite, minutes > 0 else { return nil }
                 return ExerciseProgressComparisonPoint(id: session.id, date: date, value: minutes)
             }
         }
@@ -232,7 +233,9 @@ struct ExerciseProgressView: View {
     }
 
     private var standardStrengthChart: some View {
-        let yValues = model.points.compactMap(\.estimatedOneRepMax).map(displayWeight)
+        let yValues = model.points.compactMap { point in
+            point.estimatedOneRepMax.flatMap(validDisplayWeight)
+        }
         let yDomain = ProgressChartScale.niceYDomain(
             for: yValues,
             minimumPadding: preferredUnit == .kilograms ? 2.5 : 5
@@ -241,10 +244,11 @@ struct ExerciseProgressView: View {
         let dayStride = ProgressChartScale.dayStride(for: model.points.map(\.date))
 
         return Chart(model.points) { point in
-            if let estimatedOneRepMax = point.estimatedOneRepMax {
+            if let estimatedOneRepMax = point.estimatedOneRepMax,
+               let displayValue = validDisplayWeight(estimatedOneRepMax) {
                 LineMark(
                     x: .value("Date", point.date, unit: .minute),
-                    y: .value("Estimated 1RM", displayWeight(estimatedOneRepMax))
+                    y: .value("Estimated 1RM", displayValue)
                 )
                 .interpolationMethod(.monotone)
                 .foregroundStyle(.tint)
@@ -252,7 +256,7 @@ struct ExerciseProgressView: View {
                 if model.points.count <= 24 {
                     PointMark(
                         x: .value("Date", point.date, unit: .minute),
-                        y: .value("Estimated 1RM", displayWeight(estimatedOneRepMax))
+                        y: .value("Estimated 1RM", displayValue)
                     )
                     .symbolSize(24)
                     .foregroundStyle(.tint)
@@ -279,7 +283,9 @@ struct ExerciseProgressView: View {
     }
 
     private var comparisonStrengthChart: some View {
-        let strengthValues = model.points.compactMap(\.estimatedOneRepMax).map(displayWeight)
+        let strengthValues = model.points.compactMap { point in
+            point.estimatedOneRepMax.flatMap(validDisplayWeight)
+        }
         let strengthDomain = ProgressChartScale.niceYDomain(
             for: strengthValues,
             minimumPadding: preferredUnit == .kilograms ? 2.5 : 5
@@ -300,8 +306,8 @@ struct ExerciseProgressView: View {
 
             Chart {
                 ForEach(model.points) { point in
-                    if let estimatedOneRepMax = point.estimatedOneRepMax {
-                        let value = displayWeight(estimatedOneRepMax)
+                    if let estimatedOneRepMax = point.estimatedOneRepMax,
+                       let value = validDisplayWeight(estimatedOneRepMax) {
                         LineMark(
                             x: .value("Date", point.date, unit: .minute),
                             y: .value("Estimated 1RM", normalized(value, in: strengthDomain))
@@ -391,12 +397,19 @@ struct ExerciseProgressView: View {
     }
 
     private func normalized(_ value: Double, in domain: ClosedRange<Double>) -> Double {
-        guard domain.upperBound > domain.lowerBound else { return 0.5 }
-        return min(max((value - domain.lowerBound) / (domain.upperBound - domain.lowerBound), 0), 1)
+        let span = domain.upperBound - domain.lowerBound
+        guard value.isFinite,
+              domain.lowerBound.isFinite,
+              domain.upperBound.isFinite,
+              span.isFinite,
+              span > 0 else { return 0.5 }
+        let result = (value - domain.lowerBound) / span
+        return result.isFinite ? min(max(result, 0), 1) : 0.5
     }
 
     private func denormalized(_ fraction: Double, in domain: ClosedRange<Double>) -> Double {
-        domain.lowerBound + fraction * (domain.upperBound - domain.lowerBound)
+        let result = domain.lowerBound + fraction * (domain.upperBound - domain.lowerBound)
+        return result.isFinite ? result : 0
     }
 
     private func axisLabel(_ value: Double) -> String {
@@ -470,6 +483,12 @@ struct ExerciseProgressView: View {
 
     private func displayWeight(_ kilograms: Double) -> Double {
         UnitConversion.weight(kilograms, from: .kilograms, to: preferredUnit)
+    }
+
+    private func validDisplayWeight(_ kilograms: Double) -> Double? {
+        guard kilograms.isFinite, kilograms >= 0 else { return nil }
+        let value = displayWeight(kilograms)
+        return value.isFinite ? value : nil
     }
 
     private func formattedWeight(_ kilograms: Double) -> String {

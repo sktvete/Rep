@@ -18,6 +18,10 @@ final class Exercise {
     /// without erasing notes the user wrote after this field existed.
     var userNotes: String?
     var videoAssetIdentifier: String?
+    var helpYouTubeVideoID: String?
+    var helpVideoTitle: String?
+    var helpVideoChannel: String?
+    var helpVideoVerifiedAt: String?
     /// Stable identity from Rep's versioned, app-bundled catalog.
     var bundledCatalogID: String?
     /// Catalog release that last supplied this record's canonical metadata.
@@ -66,6 +70,10 @@ final class Exercise {
         instructions: String = "",
         userNotes: String? = nil,
         videoAssetIdentifier: String? = nil,
+        helpYouTubeVideoID: String? = nil,
+        helpVideoTitle: String? = nil,
+        helpVideoChannel: String? = nil,
+        helpVideoVerifiedAt: String? = nil,
         bundledCatalogID: String? = nil,
         bundledCatalogVersion: String? = nil,
         externalCatalogID: String? = nil,
@@ -89,6 +97,10 @@ final class Exercise {
         self.instructions = instructions
         self.userNotes = userNotes?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         self.videoAssetIdentifier = videoAssetIdentifier
+        self.helpYouTubeVideoID = helpYouTubeVideoID?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.helpVideoTitle = helpVideoTitle?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.helpVideoChannel = helpVideoChannel?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.helpVideoVerifiedAt = helpVideoVerifiedAt?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         self.bundledCatalogID = bundledCatalogID
         self.bundledCatalogVersion = bundledCatalogVersion
         self.externalCatalogID = externalCatalogID

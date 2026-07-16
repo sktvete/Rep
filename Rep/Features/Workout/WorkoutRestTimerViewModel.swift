@@ -43,6 +43,7 @@ final class WorkoutRestTimerViewModel {
         remainingSeconds = seconds
         isPresented = true
         persist()
+        scheduleNotification()
         syncLiveActivity()
         startTicker()
     }
@@ -53,12 +54,14 @@ final class WorkoutRestTimerViewModel {
             self.pausedRemainingSeconds = nil
             targetDate = Date().addingTimeInterval(TimeInterval(pausedRemainingSeconds))
             persist()
+            scheduleNotification()
             syncLiveActivity()
             startTicker()
         } else {
             pausedRemainingSeconds = remainingSeconds
             targetDate = nil
             persist()
+            RestTimerNotificationManager.cancel(sessionID: sessionID)
             syncLiveActivity()
             ticker?.cancel()
         }
@@ -78,10 +81,13 @@ final class WorkoutRestTimerViewModel {
             targetDate = Date().addingTimeInterval(TimeInterval(adjusted))
         }
         persist()
+        scheduleNotification()
         syncLiveActivity()
     }
 
     func reconcileAfterForeground() {
+        reloadPersistedTimerIfNeeded()
+
         if let pausedRemainingSeconds, pausedRemainingSeconds > 0 {
             remainingSeconds = pausedRemainingSeconds
             isPresented = true
@@ -99,7 +105,7 @@ final class WorkoutRestTimerViewModel {
         }
     }
 
-    func skip() {
+    func skip(cancelNotification: Bool = true) {
         ticker?.cancel()
         targetDate = nil
         pausedRemainingSeconds = nil
@@ -107,6 +113,23 @@ final class WorkoutRestTimerViewModel {
         isPresented = false
         nextExerciseName = "Next exercise"
         UserDefaults.standard.removeObject(forKey: storageKey)
+        if cancelNotification {
+            RestTimerNotificationManager.cancel(sessionID: sessionID)
+        }
+        RestTimerLiveActivityManager.clearRest(sessionID: sessionID)
+    }
+
+    /// Ends the workout-level Live Activity as well as its current rest. Use
+    /// this for finish/discard; `skip()` intentionally keeps set controls alive.
+    func endWorkout() {
+        ticker?.cancel()
+        targetDate = nil
+        pausedRemainingSeconds = nil
+        remainingSeconds = 0
+        isPresented = false
+        nextExerciseName = "Next exercise"
+        UserDefaults.standard.removeObject(forKey: storageKey)
+        RestTimerNotificationManager.cancel(sessionID: sessionID)
         RestTimerLiveActivityManager.end(sessionID: sessionID)
     }
 
@@ -134,7 +157,9 @@ final class WorkoutRestTimerViewModel {
         let isDevTest = nextExerciseName == "Development test"
         let playHaptic = shouldPlayCompletionHaptic() && !isDevTest
         completionCount += 1
-        skip()
+        // The system notification is due at this same instant. Leave that request
+        // alone so foreground sessions receive the banner as well as the haptic.
+        skip(cancelNotification: false)
         guard playHaptic else { return }
         HapticFeedback.tripleBuzz()
     }
@@ -169,11 +194,31 @@ final class WorkoutRestTimerViewModel {
                 targetDate = restoredTarget
                 remainingSeconds = seconds
                 isPresented = true
+                scheduleNotification()
                 syncLiveActivity()
                 startTicker()
             } else {
                 skip()
             }
+        }
+    }
+
+    private func reloadPersistedTimerIfNeeded() {
+        guard let values = UserDefaults.standard.dictionary(forKey: storageKey) else { return }
+
+        if let name = values["nextExerciseName"] as? String, !name.isEmpty {
+            nextExerciseName = name
+        }
+        if let pausedSeconds = values["pausedRemainingSeconds"] as? Int, pausedSeconds > 0 {
+            pausedRemainingSeconds = pausedSeconds
+            targetDate = nil
+            remainingSeconds = pausedSeconds
+            isPresented = true
+            return
+        }
+        if let timestamp = values["targetDate"] as? TimeInterval {
+            pausedRemainingSeconds = nil
+            targetDate = Date(timeIntervalSince1970: timestamp)
         }
     }
 
@@ -185,5 +230,13 @@ final class WorkoutRestTimerViewModel {
             isPaused: isPaused,
             nextExerciseName: nextExerciseName
         )
+    }
+
+    private func scheduleNotification() {
+        guard let targetDate, !isPaused else {
+            RestTimerNotificationManager.cancel(sessionID: sessionID)
+            return
+        }
+        RestTimerNotificationManager.schedule(sessionID: sessionID, at: targetDate)
     }
 }

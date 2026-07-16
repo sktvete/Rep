@@ -32,26 +32,51 @@ enum ExerciseSeedService {
     static func seedIfNeeded(in context: ModelContext) throws -> [Exercise] {
         let existing = try context.fetch(FetchDescriptor<Exercise>())
         var byName: [String: Exercise] = [:]
-        for exercise in existing where byName[exercise.normalizedName] == nil {
-            byName[exercise.normalizedName] = exercise
+        var byExternalID: [String: Exercise] = [:]
+        for exercise in existing {
+            let normalizedName = ExerciseNameNormalizer.normalize(exercise.name)
+            if byName[normalizedName] == nil || byName[normalizedName]?.isArchived == true {
+                byName[normalizedName] = exercise
+            }
+            if let externalID = exercise.externalCatalogID, !externalID.isEmpty,
+               byExternalID[externalID] == nil || byExternalID[externalID]?.isArchived == true {
+                byExternalID[externalID] = exercise
+            }
         }
         var inserted: [Exercise] = []
         var didApplyCuratedMetadata = false
 
         for seed in seeds {
             let normalizedName = ExerciseNameNormalizer.normalize(seed.name)
-            if let exercise = byName[normalizedName], !exercise.isCustom {
+            let overrideOwner = ExerciseSeedMediaOverrides.override(forNormalizedName: normalizedName)
+                .flatMap { byExternalID[$0.catalogExerciseID] }
+            if let exercise = byName[normalizedName] ?? overrideOwner, !exercise.isCustom {
                 var changed = false
+                let oldNormalizedName = ExerciseNameNormalizer.normalize(exercise.name)
+                changed = setIfChanged(exercise, \.name, seed.name) || changed
+                changed = setIfChanged(exercise, \.normalizedName, normalizedName) || changed
                 changed = setIfChanged(exercise, \.primaryMuscleGroupRaw, seed.muscle.rawValue) || changed
                 changed = setIfChanged(exercise, \.secondaryMuscleGroupRaws, seed.secondary.map(\.rawValue)) || changed
                 changed = setIfChanged(exercise, \.equipmentRaw, seed.equipment.rawValue) || changed
                 changed = setIfChanged(exercise, \.measurementTypeRaw, seed.measurement.rawValue) || changed
+                changed = setIfChanged(exercise, \.isArchived, false) || changed
                 let aliases = uniqueAliases(exercise.searchAliases + seed.aliases)
                 changed = setIfChanged(exercise, \.searchAliases, aliases) || changed
+                if ExerciseSeedMediaOverrides.hasKnownInvalidMediaAssignment(for: exercise) {
+                    changed = setIfChanged(exercise, \.externalCatalogID, nil) || changed
+                    changed = setIfChanged(exercise, \.mediaURLString, nil) || changed
+                    changed = setIfChanged(exercise, \.instructions, "") || changed
+                    changed = setIfChanged(exercise, \.sourceName, nil) || changed
+                    changed = setIfChanged(exercise, \.sourceURLString, nil) || changed
+                }
                 if changed {
                     exercise.touch()
                     didApplyCuratedMetadata = true
                 }
+                if oldNormalizedName != normalizedName, byName[oldNormalizedName]?.id == exercise.id {
+                    byName.removeValue(forKey: oldNormalizedName)
+                }
+                byName[normalizedName] = exercise
                 continue
             }
 
@@ -71,7 +96,12 @@ enum ExerciseSeedService {
 
         let didBackfillPopularity = backfillPopularity(for: existing)
         let didBackfillAliases = backfillSearchAliases(for: existing)
-        if !inserted.isEmpty || didApplyCuratedMetadata || didBackfillPopularity || didBackfillAliases {
+        let deduplication = try ExerciseCatalogDeduplicationService.reconcile(
+            in: context,
+            saveChanges: false
+        )
+        if !inserted.isEmpty || didApplyCuratedMetadata || didBackfillPopularity || didBackfillAliases
+            || deduplication.didChange {
             try context.save()
         }
         return inserted
@@ -80,7 +110,7 @@ enum ExerciseSeedService {
     @discardableResult
     static func restoreCuratedMetadataIfPresent(for exercise: Exercise) -> Bool {
         guard !exercise.isCustom,
-              let seed = seedsByNormalizedName[exercise.normalizedName]
+              let seed = seedsByNormalizedName[ExerciseNameNormalizer.normalize(exercise.name)]
         else { return false }
 
         var changed = false
@@ -91,13 +121,6 @@ enum ExerciseSeedService {
         changed = setIfChanged(exercise, \.equipmentRaw, seed.equipment.rawValue) || changed
         changed = setIfChanged(exercise, \.measurementTypeRaw, seed.measurement.rawValue) || changed
         changed = setIfChanged(exercise, \.searchAliases, seed.aliases) || changed
-        changed = setIfChanged(exercise, \.sourceName, nil) || changed
-        changed = setIfChanged(exercise, \.sourceURLString, nil) || changed
-        changed = setIfChanged(exercise, \.externalCatalogID, nil) || changed
-        changed = setIfChanged(exercise, \.mediaURLString, nil) || changed
-        changed = setIfChanged(exercise, \.instructions, "") || changed
-        changed = setIfChanged(exercise, \.bundledCatalogID, nil) || changed
-        changed = setIfChanged(exercise, \.bundledCatalogVersion, nil) || changed
         if changed {
             exercise.touch()
         }
@@ -110,7 +133,8 @@ enum ExerciseSeedService {
     static func backfillPopularity(for exercises: [Exercise]) -> Bool {
         var changed = false
         for exercise in exercises where exercise.popularityRank == ExercisePopularity.unrankedRank {
-            guard let rank = ExercisePopularity.rank(forNormalizedName: exercise.normalizedName) else { continue }
+            let normalizedName = ExerciseNameNormalizer.normalize(exercise.name)
+            guard let rank = ExercisePopularity.rank(forNormalizedName: normalizedName) else { continue }
             exercise.popularityRank = rank
             changed = true
         }
@@ -122,7 +146,8 @@ enum ExerciseSeedService {
     static func backfillSearchAliases(for exercises: [Exercise]) -> Bool {
         var changed = false
         for exercise in exercises {
-            guard let aliases = canonicalAliasesByNormalizedName[exercise.normalizedName] else { continue }
+            let normalizedName = ExerciseNameNormalizer.normalize(exercise.name)
+            guard let aliases = canonicalAliasesByNormalizedName[normalizedName] else { continue }
             let existing = Set(exercise.searchAliases.map(ExerciseNameNormalizer.normalize))
             let missing = aliases.filter { !existing.contains(ExerciseNameNormalizer.normalize($0)) }
             guard !missing.isEmpty else { continue }
@@ -136,6 +161,10 @@ enum ExerciseSeedService {
         ExerciseNameNormalizer.normalize("Back Squat"): ["Squat"],
         ExerciseNameNormalizer.normalize("Triceps Pushdown"): ["Tricep Pushdown"],
     ]
+
+    static var activeSeedNormalizedNames: Set<String> {
+        Set(seeds.map { ExerciseNameNormalizer.normalize($0.name) })
+    }
 
     private static let seedsByNormalizedName: [String: Seed] = Dictionary(
         uniqueKeysWithValues: seeds.map { (ExerciseNameNormalizer.normalize($0.name), $0) }
@@ -173,6 +202,13 @@ enum ExerciseSeedService {
         Seed("Chin-Up", .back, .bodyweight, .bodyweightAndRepetitions, secondary: [.biceps]),
         Seed("Lat Pulldown", .back, .cable, secondary: [.biceps]),
         Seed("Barbell Row", .back, .barbell, secondary: [.biceps, .core]),
+        Seed(
+            "Dumbbell Bent-Over Row",
+            .back,
+            .dumbbell,
+            secondary: [.biceps, .core],
+            aliases: ["Dumbbell Bent Over Row", "Bent-Over Dumbbell Row", "Two-Dumbbell Row"]
+        ),
         Seed("One-Arm Dumbbell Row", .back, .dumbbell, secondary: [.biceps]),
         Seed("Seated Cable Row", .back, .cable, secondary: [.biceps]),
         Seed("Chest-Supported Row", .back, .machine, secondary: [.biceps]),
@@ -186,7 +222,18 @@ enum ExerciseSeedService {
         Seed("Barbell Curl", .biceps, .barbell),
         Seed("Dumbbell Curl", .biceps, .dumbbell),
         Seed("Hammer Curl", .biceps, .dumbbell, secondary: [.back]),
-        Seed("Cable Curl", .biceps, .cable),
+        Seed(
+            "Cable Curl",
+            .biceps,
+            .cable,
+            aliases: ["Cable Biceps Curl", "Cable Bicep Curl", "Straight-Bar Cable Curl", "Cable Bar Curl"]
+        ),
+        Seed(
+            "Rope Biceps Curl",
+            .biceps,
+            .cable,
+            aliases: ["Rope Bicep Curl", "Cable Rope Curl", "Cable Rope Biceps Curl"]
+        ),
         Seed("Triceps Pushdown", .triceps, .cable, aliases: ["Tricep Pushdown"]),
         Seed("Overhead Triceps Extension", .triceps, .cable),
         Seed("Skull Crusher", .triceps, .barbell),
@@ -207,11 +254,11 @@ enum ExerciseSeedService {
         Seed("Plank", .core, .bodyweight, .duration),
         Seed("Hanging Leg Raise", .core, .bodyweight, .repetitionsOnly),
         Seed("Cable Crunch", .core, .cable),
-        Seed("Ab Wheel Rollout", .core, .other, .repetitionsOnly),
+        Seed("Ab Wheel Rollout", .core, .other, .repetitionsOnly, aliases: ["Ab Roller", "Ab Wheel"]),
         Seed("Deadlift", .fullBody, .barbell, secondary: [.back, .hamstrings, .glutes]),
         Seed("Sumo Deadlift", .fullBody, .barbell, secondary: [.glutes, .hamstrings, .quadriceps]),
         Seed("Kettlebell Swing", .fullBody, .kettlebell, secondary: [.glutes, .hamstrings]),
-        Seed("Farmer Carry", .fullBody, .dumbbell, .distanceAndDuration, secondary: [.core]),
+        Seed("Farmer Carry", .fullBody, .dumbbell, .distanceAndDuration, secondary: [.core], aliases: ["Farmer Walk", "Farmers Walk"]),
         Seed("Goblet Squat", .quadriceps, .kettlebell, secondary: [.glutes, .core]),
         Seed("Smith Machine Squat", .quadriceps, .smithMachine, secondary: [.glutes]),
         Seed("Smith Machine Bench Press", .chest, .smithMachine, secondary: [.triceps]),

@@ -45,4 +45,13 @@ enum ExercisePickerSessionCache {
         isWarmed = false
         searchModel.setUsage([:])
     }
+
+    static func invalidateAll() {
+        warmTask?.cancel()
+        warmTask = nil
+        ExerciseUsageService.invalidateCache()
+        usage = [:]
+        isWarmed = false
+        searchModel.reset()
+    }
 }

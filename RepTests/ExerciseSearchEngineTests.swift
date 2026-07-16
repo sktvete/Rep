@@ -147,4 +147,61 @@ struct ExerciseSearchEngineTests {
         let results = ExerciseSearchEngine.search(list, query: "Tricep Pushdown")
         #expect(results.first?.name == "Triceps Pushdown")
     }
+
+    @Test("Bent-over punctuation does not change search identity")
+    func bentOverDumbbellRowPunctuation() {
+        let row = Exercise(
+            name: "Dumbbell Bent-Over Row",
+            primaryMuscleGroup: .back,
+            secondaryMuscleGroups: [.biceps],
+            equipment: .dumbbell
+        )
+
+        #expect(
+            ExerciseNameNormalizer.normalize("Dumbbell Bent-over row")
+                == ExerciseNameNormalizer.normalize("Dumbbell Bent over row")
+        )
+        #expect(
+            ExerciseSearchEngine.search([row], query: "Dumbbell Bent over row").first?.id
+                == row.id
+        )
+    }
+
+    @Test("Rope bicep wording finds the normal rope curl before hammer variants")
+    func ropeBicepCurlIntent() {
+        let ropeCurl = Exercise(
+            name: "Rope Biceps Curl",
+            primaryMuscleGroup: .biceps,
+            equipment: .cable,
+            searchAliases: ["Rope Bicep Curl", "Cable Rope Curl"]
+        )
+        let hammerCurl = Exercise(
+            name: "Cable Hammer Curl With Rope",
+            primaryMuscleGroup: .biceps,
+            equipment: .cable,
+            searchAliases: ["Rope"]
+        )
+
+        let results = ExerciseSearchEngine.search(
+            [hammerCurl, ropeCurl],
+            query: "rope bicep curl"
+        )
+
+        #expect(results.first?.id == ropeCurl.id)
+    }
+
+    @Test("Straight-bar wording resolves to the standard cable curl")
+    func straightBarCableCurlAlias() {
+        let cableCurl = Exercise(
+            name: "Cable Curl",
+            primaryMuscleGroup: .biceps,
+            equipment: .cable,
+            searchAliases: ["Straight-Bar Cable Curl", "Cable Bicep Curl"]
+        )
+
+        #expect(
+            ExerciseSearchEngine.search([cableCurl], query: "straight bar bicep curl").first?.id
+                == cableCurl.id
+        )
+    }
 }

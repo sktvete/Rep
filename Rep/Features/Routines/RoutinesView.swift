@@ -102,7 +102,7 @@ struct RoutinesView: View {
                     }
                 }
             }
-            .navigationTitle("Routines")
+            .repMainNavigationTitle("Routines")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Menu {
@@ -148,7 +148,11 @@ struct RoutinesView: View {
     }
 
     private func duplicate(_ source: Routine) {
-        let copy = Routine(name: "\(source.name) Copy", notes: source.notes)
+        let copy = Routine(
+            name: "\(source.name) Copy",
+            notes: source.notes,
+            colorPreset: source.colorPreset
+        )
         let copiedExercises = source.exercises
             .sorted { $0.orderIndex < $1.orderIndex }
             .enumerated()
@@ -209,10 +213,10 @@ private struct RoutineListRow: View {
                 HStack(spacing: 12) {
                     Image(systemName: routine.isArchived ? "archivebox.fill" : "figure.strengthtraining.traditional")
                         .font(.body.weight(.semibold))
-                        .foregroundStyle(routine.isArchived ? Color.secondary : Color.accentColor)
+                        .foregroundStyle(routine.isArchived ? Color.secondary : routine.colorPreset.color)
                         .frame(width: 38, height: 38)
                         .background(
-                            routine.isArchived ? Color.secondary.opacity(0.1) : Color.accentColor.opacity(0.1),
+                            routine.isArchived ? Color.secondary.opacity(0.1) : routine.colorPreset.color.opacity(0.13),
                             in: .rect(cornerRadius: 11)
                         )
                         .accessibilityHidden(true)

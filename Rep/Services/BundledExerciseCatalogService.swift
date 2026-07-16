@@ -92,11 +92,14 @@ enum BundledExerciseCatalogError: LocalizedError, Equatable {
 enum BundledExerciseCatalogService {
     static let manifestFilename = "rep-exercise-catalog-manifest-v1.json"
     static let supportedSchemaVersion = 1
+    private static let importRevision = 1
+    private static let installedCatalogKey = "rep.bundledExerciseCatalog.installedRevision"
 
     @discardableResult
     static func seedIfNeeded(
         in context: ModelContext,
-        bundle: Bundle = .main
+        bundle: Bundle = .main,
+        defaults: UserDefaults = .standard
     ) throws -> BundledExerciseCatalogImportSummary {
         let manifestData = try resourceData(named: manifestFilename, in: bundle)
         let manifest: BundledExerciseCatalogManifest
@@ -109,8 +112,35 @@ enum BundledExerciseCatalogService {
         guard isSafeResourceFilename(manifest.payloadFilename) else {
             throw BundledExerciseCatalogError.invalidPayloadFilename
         }
+
+        let installedRevision = "\(manifest.catalogVersion)|\(importRevision)"
+        if defaults.string(forKey: installedCatalogKey) == installedRevision {
+            let version = manifest.catalogVersion
+            let descriptor = FetchDescriptor<Exercise>(
+                predicate: #Predicate { exercise in
+                    exercise.bundledCatalogVersion == version && exercise.isArchived == false
+                }
+            )
+            if try context.fetchCount(descriptor) == manifest.itemCount {
+                return BundledExerciseCatalogImportSummary(
+                    catalogVersion: manifest.catalogVersion,
+                    totalItems: manifest.itemCount,
+                    insertedItems: 0,
+                    mergedItems: manifest.itemCount,
+                    updatedItems: 0,
+                    retiredItems: 0
+                )
+            }
+        }
+
         let payloadData = try resourceData(named: manifest.payloadFilename, in: bundle)
-        return try importCatalog(manifestData: manifestData, payloadData: payloadData, in: context)
+        let summary = try importCatalog(
+            manifestData: manifestData,
+            payloadData: payloadData,
+            in: context
+        )
+        defaults.set(installedRevision, forKey: installedCatalogKey)
+        return summary
     }
 
     @discardableResult
@@ -130,8 +160,9 @@ enum BundledExerciseCatalogService {
             if let id = exercise.bundledCatalogID, byBundledID[id] == nil {
                 byBundledID[id] = exercise
             }
-            if !exercise.isCustom, byNormalizedName[exercise.normalizedName] == nil {
-                byNormalizedName[exercise.normalizedName] = exercise
+            let normalizedName = ExerciseNameNormalizer.normalize(exercise.name)
+            if !exercise.isCustom, byNormalizedName[normalizedName] == nil {
+                byNormalizedName[normalizedName] = exercise
             }
         }
 
@@ -148,13 +179,14 @@ enum BundledExerciseCatalogService {
                 incomingIDs.insert(record.id)
 
                 if let exercise = byBundledID[record.id] ?? byNormalizedName[normalizedName] {
-                    let oldNormalizedName = exercise.normalizedName
-                    let containsLegacyExerciseDBData = LegacyExerciseDBDataRemovalService.isLegacyExerciseDBRecord(exercise)
+                    let oldNormalizedName = ExerciseNameNormalizer.normalize(exercise.name)
+                    let isAdoptingLegacyRecord = exercise.bundledCatalogID == nil
+                        && LegacyExerciseDBDataRemovalService.isLegacyExerciseDBRecord(exercise)
                     var changed = false
 
                     changed = setIfChanged(exercise, \.bundledCatalogID, record.id) || changed
 
-                    if containsLegacyExerciseDBData
+                    if isAdoptingLegacyRecord
                         || exercise.bundledCatalogVersion != manifest.catalogVersion {
                         changed = setIfChanged(exercise, \.name, values.name) || changed
                         changed = setIfChanged(exercise, \.normalizedName, normalizedName) || changed
@@ -168,13 +200,13 @@ enum BundledExerciseCatalogService {
                     }
                     changed = setIfChanged(exercise, \.isArchived, false) || changed
 
-                    if containsLegacyExerciseDBData {
+                    if isAdoptingLegacyRecord {
                         changed = setIfChanged(exercise, \.instructions, "") || changed
                         changed = setIfChanged(exercise, \.externalCatalogID, nil) || changed
                         changed = setIfChanged(exercise, \.mediaURLString, nil) || changed
                     }
 
-                    let aliases = containsLegacyExerciseDBData
+                    let aliases = isAdoptingLegacyRecord
                         ? values.aliases
                         : uniqueAliases(exercise.searchAliases + values.aliases)
                     changed = setIfChanged(exercise, \.searchAliases, aliases) || changed

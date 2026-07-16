@@ -7,9 +7,17 @@ struct HistoryView: View {
     @Query(sort: \WorkoutSession.startedAt, order: .reverse)
     private var sessions: [WorkoutSession]
 
+    @Query private var routines: [Routine]
     @Query private var settings: [UserSettings]
 
     @State private var errorMessage: String?
+    @State private var resumingSessionID: UUID?
+
+    private let onOpenWorkout: (WorkoutSession) -> Void
+
+    init(onOpenWorkout: @escaping (WorkoutSession) -> Void = { _ in }) {
+        self.onOpenWorkout = onOpenWorkout
+    }
 
     private var preferredUnit: WeightUnit {
         settings.first?.preferredWeightUnit ?? .kilograms
@@ -17,6 +25,10 @@ struct HistoryView: View {
 
     private var completedSessions: [WorkoutSession] {
         sessions.filter { $0.state == .completed }
+    }
+
+    private var ongoingSessions: [WorkoutSession] {
+        sessions.filter { $0.state == .active }
     }
 
     private var groupedSessions: [(date: Date, sessions: [WorkoutSession])] {
@@ -34,7 +46,7 @@ struct HistoryView: View {
             ZStack {
                 RepScreenBackground()
 
-                if completedSessions.isEmpty {
+                if completedSessions.isEmpty && ongoingSessions.isEmpty {
                     ContentUnavailableView {
                         Label("No workouts yet", systemImage: "clock.arrow.circlepath")
                     } description: {
@@ -42,11 +54,41 @@ struct HistoryView: View {
                     }
                 } else {
                     List {
-                        Section {
-                            HistoryOverviewCard(sessions: completedSessions)
-                                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 10, trailing: 16))
-                                .listRowBackground(Color.clear)
-                                .listRowSeparator(.hidden)
+                        if !ongoingSessions.isEmpty {
+                            Section {
+                                ForEach(ongoingSessions) { session in
+                                    Button {
+                                        resume(session)
+                                    } label: {
+                                        OngoingWorkoutRow(
+                                            session: session,
+                                            color: routineColor(for: session),
+                                            isResuming: resumingSessionID == session.id
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                    .disabled(resumingSessionID != nil)
+                                    .listRowInsets(EdgeInsets(top: 5, leading: 16, bottom: 5, trailing: 16))
+                                    .listRowBackground(Color.clear)
+                                    .listRowSeparator(.hidden)
+                                    .accessibilityHint("Returns to this workout")
+                                }
+                            } header: {
+                                Text("Ongoing")
+                                    .font(.subheadline.weight(.semibold))
+                                    .repSecondaryText()
+                                    .textCase(nil)
+                                    .padding(.top, 8)
+                            }
+                        }
+
+                        if !completedSessions.isEmpty {
+                            Section {
+                                HistoryOverviewCard(sessions: completedSessions)
+                                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 10, trailing: 16))
+                                    .listRowBackground(Color.clear)
+                                    .listRowSeparator(.hidden)
+                            }
                         }
 
                         ForEach(groupedSessions, id: \.date) { group in
@@ -54,8 +96,13 @@ struct HistoryView: View {
                                 ForEach(group.sessions) { session in
                                     NavigationLink {
                                         WorkoutHistoryDetailView(session: session, preferredUnit: preferredUnit)
+                                            .tint(routineColor(for: session))
                                     } label: {
-                                        WorkoutHistoryRow(session: session, preferredUnit: preferredUnit)
+                                        WorkoutHistoryRow(
+                                            session: session,
+                                            preferredUnit: preferredUnit,
+                                            color: routineColor(for: session)
+                                        )
                                     }
                                     .navigationLinkIndicatorVisibility(.hidden)
                                     .buttonStyle(.plain)
@@ -84,7 +131,8 @@ struct HistoryView: View {
                     .repSoftScrollEdges()
                 }
             }
-            .navigationTitle("History")
+            .repMainNavigationTitle("History")
+            .onAppear { AppLog.breadcrumb("History opened") }
             .alert("Couldn’t delete the workout", isPresented: Binding(
                 get: { errorMessage != nil },
                 set: { if !$0 { errorMessage = nil } }
@@ -100,6 +148,34 @@ struct HistoryView: View {
         session.completedAt ?? session.startedAt
     }
 
+    private func routineColor(for session: WorkoutSession) -> Color {
+        if let routineID = session.routineID,
+           let routine = routines.first(where: { $0.id == routineID }) {
+            return routine.colorPreset.color
+        }
+        return session.routineColorPreset?.color ?? Color.accentColor
+    }
+
+    private func resume(_ session: WorkoutSession) {
+        guard resumingSessionID == nil else { return }
+        let sessionID = session.id
+        resumingSessionID = sessionID
+        AppLog.breadcrumb("History resume requested: \(sessionID.uuidString)")
+
+        // Let the List finish its button transaction before the app swaps root pages.
+        Task { @MainActor in
+            await Task.yield()
+            guard resumingSessionID == sessionID,
+                  let currentSession = sessions.first(where: { $0.id == sessionID }),
+                  currentSession.state == .active else {
+                resumingSessionID = nil
+                return
+            }
+            resumingSessionID = nil
+            onOpenWorkout(currentSession)
+        }
+    }
+
     private func delete(_ session: WorkoutSession) {
         modelContext.delete(session)
         do {
@@ -108,6 +184,57 @@ struct HistoryView: View {
             AppLog.persistenceFailure(operation: "Delete workout from history", error: error)
             errorMessage = error.localizedDescription
         }
+    }
+}
+
+private struct OngoingWorkoutRow: View {
+    let session: WorkoutSession
+    let color: Color
+    let isResuming: Bool
+
+    var body: some View {
+        HStack(spacing: 13) {
+            Image(systemName: "bolt.fill")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(color)
+                .frame(width: 40, height: 40)
+                .background(color.opacity(0.13), in: .rect(cornerRadius: 12))
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(session.name)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                TimelineView(.periodic(from: .now, by: 60)) { context in
+                    Text(session.duration(at: context.date).formattedWorkoutDuration)
+                        .font(.subheadline.monospacedDigit())
+                        .repSecondaryText()
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            VStack(alignment: .trailing, spacing: 5) {
+                if isResuming {
+                    ProgressView()
+                        .tint(color)
+                        .accessibilityLabel("Opening workout")
+                } else {
+                    Text("Resume")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(color)
+                }
+                Text("\(session.completedSetCount) sets")
+                    .font(.caption.monospacedDigit())
+                    .repSecondaryText()
+            }
+        }
+        .padding(16)
+        .repSurface()
+        .contentShape(.rect)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Ongoing \(session.name), \(session.completedSetCount) sets completed")
     }
 }
 
@@ -161,6 +288,7 @@ private struct HistoryOverviewMetric: View {
 private struct WorkoutHistoryRow: View {
     let session: WorkoutSession
     let preferredUnit: WeightUnit
+    let color: Color
 
     private var completedSets: Int { session.completedSetCount }
 
@@ -180,9 +308,9 @@ private struct WorkoutHistoryRow: View {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "figure.strengthtraining.traditional")
                     .font(.body.weight(.semibold))
-                    .foregroundStyle(RepVisualSystem.tint)
+                    .foregroundStyle(color)
                     .frame(width: 38, height: 38)
-                    .background(RepVisualSystem.tint.opacity(0.12), in: .rect(cornerRadius: 11))
+                    .background(color.opacity(0.13), in: .rect(cornerRadius: 11))
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 3) {

@@ -12,11 +12,13 @@ struct EpleyOneRepMaxFormula: OneRepMaxFormula {
     }
 
     func estimate(weight: Double, repetitions: Int) -> Double? {
-        guard weight > 0,
+        guard weight.isFinite,
+              weight > 0,
               repetitions > 0,
               repetitions <= maximumSuitableRepetitions else { return nil }
         if repetitions == 1 { return weight }
-        return weight * (1 + Double(repetitions) / 30)
+        let estimate = weight * (1 + Double(repetitions) / 30)
+        return estimate.isFinite ? estimate : nil
     }
 }
 
@@ -48,10 +50,12 @@ enum ProgressCalculator {
     static func volume(weight: Double?, repetitions: Int?, measurementType: MeasurementType) -> Double? {
         guard measurementType.supportsExternalWeightVolume,
               let weight,
+              weight.isFinite,
               weight >= 0,
               let repetitions,
               repetitions > 0 else { return nil }
-        return weight * Double(repetitions)
+        let result = weight * Double(repetitions)
+        return result.isFinite ? result : nil
     }
 
     static func personalRecords(for sessions: [WorkoutSession], exerciseID: UUID) -> PersonalRecords {
@@ -64,11 +68,15 @@ enum ProgressCalculator {
             for item in session.exercises where item.exercise?.id == exerciseID {
                 guard let measurementType = item.exercise?.measurementType else { continue }
                 for set in item.sets where set.isCompleted {
-                    if let weight = set.weight, weight >= 0 {
+                    if let weight = set.weight, weight.isFinite, weight >= 0 {
                         records.highestWeight = max(records.highestWeight ?? weight, weight)
                     }
 
-                    if let weight = set.weight, let repetitions = set.repetitions, repetitions > 0 {
+                    if let weight = set.weight,
+                       weight.isFinite,
+                       weight >= 0,
+                       let repetitions = set.repetitions,
+                       repetitions > 0 {
                         let candidate = RepetitionRecord(weight: weight, repetitions: repetitions)
                         if isBetterRepetitionRecord(candidate, than: records.mostRepetitionsAtWeight) {
                             records.mostRepetitionsAtWeight = candidate
@@ -85,9 +93,12 @@ enum ProgressCalculator {
                         repetitions: set.repetitions,
                         measurementType: measurementType
                     ) {
-                        hasApplicableVolume = true
-                        sessionVolume += setVolume
                         records.highestSetVolume = max(records.highestSetVolume ?? setVolume, setVolume)
+                        let updatedSessionVolume = sessionVolume + setVolume
+                        if updatedSessionVolume.isFinite {
+                            hasApplicableVolume = true
+                            sessionVolume = updatedSessionVolume
+                        }
                     }
                 }
             }

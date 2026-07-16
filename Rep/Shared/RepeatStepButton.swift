@@ -1,46 +1,21 @@
 import SwiftUI
 
-/// Fires `action` immediately on press, then repeats after a short delay while held.
+/// Uses the system repeat behavior so scrolling or cancelling a touch never changes the value.
 struct RepeatStepButton: View {
     let systemImage: String
     let accessibilityLabel: String
     let action: () -> Void
 
-    @State private var repeatTask: Task<Void, Never>?
-
     var body: some View {
-        Image(systemName: systemImage)
-            .font(.subheadline.weight(.bold))
-            .repSecondaryText()
-            .frame(width: 32, height: 44)
-            .contentShape(Rectangle())
-            .accessibilityLabel(accessibilityLabel)
-            .accessibilityAddTraits(.isButton)
-            .onLongPressGesture(minimumDuration: .infinity, pressing: { isPressing in
-                if isPressing {
-                    beginRepeat()
-                } else {
-                    endRepeat()
-                }
-            }, perform: {})
-    }
-
-    private func beginRepeat() {
-        action()
-        repeatTask?.cancel()
-        repeatTask = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(300))
-            var intervalMs = 140
-            while !Task.isCancelled {
-                action()
-                try? await Task.sleep(for: .milliseconds(intervalMs))
-                intervalMs = max(60, intervalMs - 8)
-            }
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.caption.weight(.bold))
+                .repSecondaryText()
+                .frame(width: 26, height: 42)
+                .contentShape(Rectangle())
         }
-    }
-
-    private func endRepeat() {
-        repeatTask?.cancel()
-        repeatTask = nil
+        .buttonStyle(.plain)
+        .buttonRepeatBehavior(.enabled)
+        .accessibilityLabel(accessibilityLabel)
     }
 }

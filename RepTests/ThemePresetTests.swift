@@ -77,6 +77,32 @@ struct ManualAppColorTests {
         let colors = RepThemeSettings(settings: userSettings)
         #expect(colors.lightPalette.accent.green > colors.lightPalette.accent.red)
         #expect(colors.darkPalette.background == RepRGBAColor(red: 0, green: 0, blue: 0))
-        #expect(userSettings.themeResetGeneration == 3)
+        #expect(userSettings.themeResetGeneration == 4)
+    }
+
+    @Test("Secondary text migration preserves every other custom color")
+    func secondaryTextMigration() {
+        let userSettings = UserSettings()
+        let customAccent = RepRGBAColor(red: 0.9, green: 0.1, blue: 0.4, alpha: 0.8)
+        let customDarkText = RepRGBAColor(red: 0.7, green: 0.8, blue: 0.9, alpha: 0.75)
+        userSettings.themeResetGeneration = 3
+        userSettings.lightAccentRGBA = customAccent.serialized
+        userSettings.lightSecondaryTextRGBA = RepRGBAColor(
+            red: 60 / 255,
+            green: 60 / 255,
+            blue: 67 / 255,
+            alpha: 0.6
+        ).serialized
+        userSettings.darkSecondaryTextRGBA = customDarkText.serialized
+
+        UserSettingsThemeMigration.backfill(userSettings)
+
+        let colors = RepThemeSettings(settings: userSettings)
+        let lightHSV = RepHSVColor(rgba: colors.lightPalette.secondaryText)
+        #expect(colors.lightPalette.accent == customAccent)
+        #expect(abs(lightHSV.value - 0.16) < 0.000_001)
+        #expect(lightHSV.alpha == 1)
+        #expect(colors.darkPalette.secondaryText == customDarkText)
+        #expect(userSettings.themeResetGeneration == 4)
     }
 }

@@ -311,16 +311,7 @@ enum ExerciseSearchEngine {
     }
 
     static func normalize(_ value: String) -> String {
-        let folded = value.folding(
-            options: [.caseInsensitive, .diacriticInsensitive],
-            locale: Locale(identifier: "en_US_POSIX")
-        )
-        let sanitized = String(folded.unicodeScalars.map {
-            CharacterSet.alphanumerics.contains($0) ? Character(String($0)) : " "
-        })
-        return sanitized
-            .split(whereSeparator: \Character.isWhitespace)
-            .joined(separator: " ")
+        ExerciseNameNormalizer.normalize(value)
     }
 
     static func tokens(in value: String) -> [String] {
@@ -522,6 +513,16 @@ extension ExerciseSearchEngine {
         usage: [UUID: Int] = [:],
         limit: Int
     ) -> [UUID] {
+        (try? searchIDsCancellable(candidates, query: query, usage: usage, limit: limit)) ?? []
+    }
+
+    static func searchIDsCancellable(
+        _ candidates: [SearchCandidate],
+        query: String,
+        usage: [UUID: Int] = [:],
+        limit: Int
+    ) throws -> [UUID] {
+        try Task.checkCancellation()
         let queryPhrase = normalize(query)
         guard !queryPhrase.isEmpty else { return [] }
 
@@ -531,7 +532,10 @@ extension ExerciseSearchEngine {
         var ranked: [RankedSearchID] = []
         ranked.reserveCapacity(min(limit * 2, candidates.count))
 
-        for candidate in candidates {
+        for (index, candidate) in candidates.enumerated() {
+            if index.isMultiple(of: 32) {
+                try Task.checkCancellation()
+            }
             guard candidate.document.mightMatch(queryPhrase: queryPhrase, queryTokens: queryTokens) else {
                 continue
             }
@@ -548,6 +552,7 @@ extension ExerciseSearchEngine {
             )
         }
 
+        try Task.checkCancellation()
         ranked.sort { lhs, rhs in
             if lhs.score != rhs.score { return lhs.score > rhs.score }
             if lhs.usage != rhs.usage { return lhs.usage > rhs.usage }
@@ -558,6 +563,7 @@ extension ExerciseSearchEngine {
         if ranked.count > limit {
             ranked.removeSubrange(limit...)
         }
+        try Task.checkCancellation()
         return ranked.map(\.id)
     }
 

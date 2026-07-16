@@ -76,7 +76,11 @@ struct BodyweightProgressView: View {
         }
         .task(id: entriesSignature) {
             visibleEntries = entries
-                .filter { timeRange.includes($0.measuredAt) }
+                .filter {
+                    $0.weightKilograms.isFinite
+                        && $0.weightKilograms > 0
+                        && timeRange.includes($0.measuredAt)
+                }
                 .sorted { $0.measuredAt < $1.measuredAt }
         }
         .toolbar {

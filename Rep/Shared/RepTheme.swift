@@ -167,7 +167,12 @@ enum RepThemeDefaults {
         surface: RepRGBAColor(red: 1, green: 1, blue: 1),
         backdropShadow: RepRGBAColor(red: 0, green: 0, blue: 0, alpha: 0.1),
         controls: RepRGBAColor(red: 229 / 255, green: 229 / 255, blue: 234 / 255),
-        secondaryText: RepRGBAColor(red: 60 / 255, green: 60 / 255, blue: 67 / 255, alpha: 0.6)
+        secondaryText: RepHSVColor(
+            hue: 2 / 3,
+            saturation: 7 / 67,
+            value: 0.16,
+            alpha: 1
+        ).rgba
     )
 
     static let dark = RepThemePalette(

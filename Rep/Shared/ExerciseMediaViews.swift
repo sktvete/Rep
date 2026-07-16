@@ -1,17 +1,78 @@
+import ImageIO
 import SwiftUI
+import UIKit
+import WebKit
+
+struct ExerciseCatalogStatusView: View {
+    let isLoading: Bool
+    let progress: Double?
+    let errorMessage: String?
+    let onRetry: () -> Void
+
+    var body: some View {
+        if isLoading {
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Updating exercise catalog…")
+                        .font(.caption.weight(.medium))
+                    Spacer()
+                    if let progress {
+                        Text(progress, format: .percent.precision(.fractionLength(0)))
+                            .font(.caption.monospacedDigit())
+                            .repSecondaryText()
+                    }
+                }
+                if let progress {
+                    ProgressView(value: progress)
+                        .tint(.accentColor)
+                }
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Updating exercise catalog")
+            .accessibilityValue(progress.map { $0.formatted(.percent.precision(.fractionLength(0))) } ?? "In progress")
+        } else if let errorMessage {
+            HStack(alignment: .center, spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Catalog update paused")
+                        .font(.caption.weight(.semibold))
+                    Text(errorMessage)
+                        .font(.caption2)
+                        .repSecondaryText()
+                        .lineLimit(2)
+                }
+                Spacer()
+                Button("Retry", action: onRetry)
+                    .font(.caption.weight(.semibold))
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+            }
+        }
+    }
+}
 
 struct ExercisePickerRow: View {
     let exercise: Exercise
+    var loadsImages: Bool = true
+    var listIndex: Int? = nil
     let onSelect: () -> Void
     let onShowDetails: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
             Button(action: onShowDetails) {
-                ExerciseMediaThumbnail(exercise: exercise)
+                ExerciseMediaThumbnail(
+                    exercise: exercise,
+                    loadsImage: loadsImages,
+                    listIndex: listIndex
+                )
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Show details for \(exercise.name)")
+            .accessibilityLabel("Show how to perform \(exercise.name)")
 
             Button(action: onSelect) {
                 HStack(spacing: 12) {
@@ -43,13 +104,91 @@ struct ExercisePickerRow: View {
     }
 }
 
-/// A deterministic local placeholder. Exercise media is shown only after Rep has a
-/// redistribution license and serves assets from Rep-controlled storage.
 struct ExerciseMediaThumbnail: View {
     let exercise: Exercise
     var size: CGFloat = 58
+    var loadsImage: Bool = true
+    var listIndex: Int? = nil
+
+    private var mediaURL: URL? {
+        guard let value = exercise.mediaURLString,
+              !value.isEmpty else { return nil }
+        return URL(string: value)
+    }
+
+    @Environment(\.displayScale) private var displayScale
+    @Environment(\.exerciseThumbnailScopeID) private var scopeID
+    @State private var image: UIImage?
+    @State private var didFail = false
+    @State private var isOnScreen = false
 
     var body: some View {
+        Group {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else if didFail || mediaURL == nil {
+                placeholder
+            } else {
+                placeholder
+                    .overlay { ProgressView().controlSize(.small) }
+            }
+        }
+        .frame(width: size, height: size)
+        .background(Color(.tertiarySystemGroupedBackground))
+        .clipShape(.rect(cornerRadius: max(10, size * 0.2)))
+        .overlay {
+            RoundedRectangle(cornerRadius: max(10, size * 0.2))
+                .strokeBorder(Color.primary.opacity(0.06))
+        }
+        .accessibilityHidden(true)
+        .onAppear {
+            isOnScreen = true
+            if let scopeID, let listIndex {
+                ExerciseThumbnailListTracker.shared.registerVisibleRow(scopeID: scopeID, index: listIndex)
+            }
+        }
+        .onDisappear {
+            isOnScreen = false
+        }
+        .task(id: loadTaskID) {
+            image = nil
+            didFail = false
+            guard loadsImage, let mediaURL else { return }
+            let maxPixel = size * max(1, displayScale)
+            let priority = loadPriority
+            let loaded = await ExerciseThumbnailCache.shared.thumbnail(
+                for: mediaURL,
+                maxPixelSize: maxPixel,
+                priority: priority
+            )
+            guard !Task.isCancelled else { return }
+            if let loaded {
+                image = loaded
+            } else {
+                didFail = true
+            }
+        }
+    }
+
+    private var loadPriority: ExerciseThumbnailLoadPriority {
+        guard let scopeID else {
+            return isOnScreen ? .onScreen(listIndex: listIndex ?? 0) : .background
+        }
+        return ExerciseThumbnailScopeCenter.shared.priority(
+            scopeID: scopeID,
+            listIndex: listIndex,
+            isOnScreen: isOnScreen
+        )
+    }
+
+    private var loadTaskID: String {
+        guard loadsImage, let mediaURL else { return "idle" }
+        return mediaURL.absoluteString
+    }
+
+    private var placeholder: some View {
         ZStack {
             LinearGradient(
                 colors: [Color.accentColor.opacity(0.16), Color.accentColor.opacity(0.055)],
@@ -60,14 +199,6 @@ struct ExerciseMediaThumbnail: View {
                 .font(.system(size: size * 0.32, weight: .semibold))
                 .foregroundStyle(.tint)
         }
-        .frame(width: size, height: size)
-        .background(Color(.tertiarySystemGroupedBackground))
-        .clipShape(.rect(cornerRadius: max(10, size * 0.2)))
-        .overlay {
-            RoundedRectangle(cornerRadius: max(10, size * 0.2))
-                .strokeBorder(Color.primary.opacity(0.06))
-        }
-        .accessibilityHidden(true)
     }
 
     private var symbolName: String {
@@ -84,18 +215,255 @@ struct ExerciseMediaThumbnail: View {
     }
 }
 
+/// Loads and caches small, static exercise thumbnails.
+///
+/// Catalog media are animated GIFs. Rendering hundreds of them with `AsyncImage` decodes
+/// every frame and thrashes memory while the list scrolls. This cache downsamples just
+/// the first frame to the displayed size via ImageIO and keeps results in memory, so the
+/// picker stays smooth even with the full catalog. On-disk byte caching is handled by the
+/// shared `URLCache`.
+///
+/// Loads are prioritized: on-screen rows first, then a short prefetch window below the
+/// fold, then everything else.
+actor ExerciseThumbnailCache {
+    static let shared = ExerciseThumbnailCache()
+
+    private struct QueuedLoad {
+        let key: String
+        let url: URL
+        let maxPixel: CGFloat
+        var priority: ExerciseThumbnailLoadPriority
+    }
+
+    private let memory = NSCache<NSString, UIImage>()
+    private var queue: [QueuedLoad] = []
+    private var waiters: [String: [CheckedContinuation<UIImage?, Never>]] = [:]
+    private var inFlight: Set<String> = []
+    private var activeCount = 0
+    private let maxConcurrent = 6
+    private let session: URLSession
+
+    init(session: URLSession = .shared) {
+        self.session = session
+        memory.countLimit = 400
+    }
+
+    func thumbnail(
+        for url: URL,
+        maxPixelSize: CGFloat,
+        priority: ExerciseThumbnailLoadPriority = .background
+    ) async -> UIImage? {
+        let maxPixel = max(1, maxPixelSize)
+        let key = cacheKey(url: url, maxPixel: maxPixel)
+
+        if let cached = memory.object(forKey: key as NSString) { return cached }
+        if inFlight.contains(key) {
+            return await wait(for: key, url: url, maxPixel: maxPixel, priority: priority)
+        }
+
+        return await wait(for: key, url: url, maxPixel: maxPixel, priority: priority)
+    }
+
+    private func wait(
+        for key: String,
+        url: URL,
+        maxPixel: CGFloat,
+        priority: ExerciseThumbnailLoadPriority
+    ) async -> UIImage? {
+        enqueue(key: key, url: url, maxPixel: maxPixel, priority: priority)
+        return await withCheckedContinuation { continuation in
+            waiters[key, default: []].append(continuation)
+        }
+    }
+
+    private func enqueue(
+        key: String,
+        url: URL,
+        maxPixel: CGFloat,
+        priority: ExerciseThumbnailLoadPriority
+    ) {
+        if let index = queue.firstIndex(where: { $0.key == key }) {
+            if priority > queue[index].priority {
+                queue[index].priority = priority
+                queue.sort { $0.priority > $1.priority }
+            }
+        } else {
+            queue.append(QueuedLoad(key: key, url: url, maxPixel: maxPixel, priority: priority))
+            queue.sort { $0.priority > $1.priority }
+        }
+        drain()
+    }
+
+    private func drain() {
+        guard activeCount < maxConcurrent else { return }
+        guard let next = queue.first else { return }
+        queue.removeFirst()
+        guard !inFlight.contains(next.key) else {
+            drain()
+            return
+        }
+
+        inFlight.insert(next.key)
+        activeCount += 1
+
+        let key = next.key
+        let url = next.url
+        let maxPixel = next.maxPixel
+        let priority = next.priority
+
+        Task.detached(priority: priority.taskPriority) { [session] in
+            let image = await Self.fetchImage(
+                url: url,
+                maxPixel: maxPixel,
+                session: session
+            )
+            await ExerciseThumbnailCache.shared.finish(
+                key: key,
+                image: image
+            )
+        }
+    }
+
+    private func finish(key: String, image: UIImage?) {
+        inFlight.remove(key)
+        activeCount = max(0, activeCount - 1)
+        if let image {
+            memory.setObject(image, forKey: key as NSString)
+        }
+        let continuations = waiters.removeValue(forKey: key) ?? []
+        for continuation in continuations {
+            continuation.resume(returning: image)
+        }
+        drain()
+    }
+
+    func clearMemory() {
+        memory.removeAllObjects()
+        queue.removeAll()
+        inFlight.removeAll()
+        activeCount = 0
+        for continuations in waiters.values {
+            for continuation in continuations {
+                continuation.resume(returning: nil)
+            }
+        }
+        waiters.removeAll()
+    }
+
+    private func cacheKey(url: URL, maxPixel: CGFloat) -> String {
+        "\(url.absoluteString)|\(Int(maxPixel))"
+    }
+
+    private static func fetchImage(
+        url: URL,
+        maxPixel: CGFloat,
+        session: URLSession
+    ) async -> UIImage? {
+        var request = URLRequest(url: url)
+        request.setValue("image/*", forHTTPHeaderField: "Accept")
+        guard let (data, response) = try? await session.data(for: request),
+              (response as? HTTPURLResponse).map({ (200..<300).contains($0.statusCode) }) ?? true,
+              let image = downsample(data: data, maxPixelSize: maxPixel)
+        else { return nil }
+        return image
+    }
+
+    private static func downsample(data: Data, maxPixelSize: CGFloat) -> UIImage? {
+        let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let source = CGImageSourceCreateWithData(data as CFData, sourceOptions) else { return nil }
+        let options = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize
+        ] as CFDictionary
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options) else { return nil }
+        return UIImage(cgImage: cgImage)
+    }
+}
+
+struct ExerciseAnimatedMediaView: UIViewRepresentable {
+    let url: URL
+    let accessibilityLabel: String
+
+    func makeUIView(context: Context) -> WKWebView {
+        let configuration = WKWebViewConfiguration()
+        configuration.allowsInlineMediaPlayback = true
+        configuration.mediaTypesRequiringUserActionForPlayback = .all
+
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.isOpaque = false
+        webView.backgroundColor = .clear
+        webView.scrollView.backgroundColor = .clear
+        webView.scrollView.isScrollEnabled = false
+        webView.scrollView.bounces = false
+        webView.isAccessibilityElement = true
+        webView.accessibilityLabel = accessibilityLabel
+        return webView
+    }
+
+    func updateUIView(_ webView: WKWebView, context: Context) {
+        guard context.coordinator.loadedURL != url else { return }
+        context.coordinator.loadedURL = url
+
+        let source = htmlEscaped(url.absoluteString)
+        let isVideo = ["mp4", "mov", "m4v", "webm"].contains(url.pathExtension.lowercased())
+        let media = isVideo
+            ? "<video src=\"\(source)\" controls playsinline preload=\"metadata\"></video>"
+            : "<img src=\"\(source)\" alt=\"Exercise demonstration\">"
+        let html = """
+        <!doctype html>
+        <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+          <style>
+            * { box-sizing: border-box; }
+            html, body { width: 100%; height: 100%; margin: 0; background: transparent; overflow: hidden; }
+            body { display: flex; align-items: center; justify-content: center; }
+            img, video { display: block; width: 100%; height: 100%; object-fit: contain; }
+          </style>
+        </head>
+        <body>\(media)</body>
+        </html>
+        """
+        webView.loadHTMLString(html, baseURL: nil)
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    final class Coordinator {
+        var loadedURL: URL?
+    }
+
+    private func htmlEscaped(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+    }
+}
+
 struct ExerciseDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
 
     let exercise: Exercise
 
+    @State private var catalogService = ExerciseDBCatalogService()
+    @State private var isLoadingReference = false
+    @State private var referenceError: String?
+
+    private var mediaURL: URL? {
+        guard let value = exercise.mediaURLString,
+              !value.isEmpty else { return nil }
+        return URL(string: value)
+    }
+
     private var sourceURL: URL? {
         guard let value = exercise.sourceURLString,
-              let url = URL(string: value),
-              let scheme = url.scheme?.lowercased(),
-              scheme == "https" || scheme == "http"
-        else { return nil }
-        return url
+              !value.isEmpty else { return nil }
+        return URL(string: value)
     }
 
     private var instructionSteps: [String] {
@@ -109,11 +477,26 @@ struct ExerciseDetailView: View {
         return value
     }
 
+    private var helpVideoURL: URL? {
+        guard let videoID = exercise.helpYouTubeVideoID,
+              ExerciseHelpVideoCatalog.isValidYouTubeVideoID(videoID)
+        else { return nil }
+        return URL(string: "https://www.youtube.com/watch?v=\(videoID)")
+    }
+
+    private var helpVideoChannel: String? {
+        exercise.helpVideoChannel?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     media
+
+                    if let helpVideoURL {
+                        helpVideoLink(helpVideoURL)
+                    }
 
                     VStack(alignment: .leading, spacing: 8) {
                         Text(exercise.name)
@@ -145,10 +528,10 @@ struct ExerciseDetailView: View {
                             HStack(spacing: 10) {
                                 Image(systemName: "safari")
                                 VStack(alignment: .leading, spacing: 1) {
-                                    Text("Catalog source")
+                                    Text("Exercise source")
                                         .font(.caption)
                                         .repSecondaryText()
-                                    Text(exercise.sourceName ?? "View source")
+                                    Text(exercise.sourceName ?? "View original")
                                         .font(.subheadline.weight(.semibold))
                                 }
                                 Spacer()
@@ -173,6 +556,9 @@ struct ExerciseDetailView: View {
                     Button("Done") { dismiss() }
                 }
             }
+            .task(id: exercise.mediaURLString) {
+                await loadReferenceIfNeeded()
+            }
         }
     }
 
@@ -186,21 +572,69 @@ struct ExerciseDetailView: View {
             .joined(separator: ", ")
     }
 
+    @ViewBuilder
     private var media: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "figure.strengthtraining.traditional")
-                .font(.system(size: 42, weight: .medium))
-                .foregroundStyle(.tint)
-            Text("Movement media isn’t bundled yet")
-                .font(.subheadline.weight(.medium))
-                .repSecondaryText()
-                .multilineTextAlignment(.center)
+        if let mediaURL {
+            ExerciseAnimatedMediaView(
+                url: mediaURL,
+                accessibilityLabel: "Animated demonstration of \(exercise.name)"
+            )
+            .frame(maxWidth: .infinity)
+            .aspectRatio(4 / 3, contentMode: .fit)
+            .background(Color(.secondarySystemGroupedBackground))
+            .clipShape(.rect(cornerRadius: RepVisualSystem.cardRadius))
+            .overlay {
+                RoundedRectangle(cornerRadius: RepVisualSystem.cardRadius)
+                    .strokeBorder(Color.primary.opacity(0.07))
+            }
+        } else {
+            VStack(spacing: 10) {
+                if isLoadingReference {
+                    ProgressView()
+                        .controlSize(.large)
+                    Text("Loading movement reference…")
+                        .font(.subheadline.weight(.medium))
+                        .repSecondaryText()
+                } else {
+                    Image(systemName: "figure.strengthtraining.traditional")
+                        .font(.system(size: 42, weight: .medium))
+                        .foregroundStyle(.tint)
+                    Text(referenceError ?? "Movement reference coming soon")
+                        .font(.subheadline.weight(.medium))
+                        .repSecondaryText()
+                        .multilineTextAlignment(.center)
+                    if referenceError != nil {
+                        Button("Try Again") {
+                            Task { await loadReferenceIfNeeded() }
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+            }
+            .padding()
+            .frame(maxWidth: .infinity)
+            .aspectRatio(4 / 3, contentMode: .fit)
+            .background(Color.accentColor.opacity(0.08))
+            .clipShape(.rect(cornerRadius: RepVisualSystem.cardRadius))
         }
-        .padding()
-        .frame(maxWidth: .infinity)
-        .aspectRatio(4 / 3, contentMode: .fit)
-        .background(Color.accentColor.opacity(0.08))
-        .clipShape(.rect(cornerRadius: RepVisualSystem.cardRadius))
+    }
+
+    private func loadReferenceIfNeeded() async {
+        guard mediaURL == nil, !isLoadingReference else { return }
+        isLoadingReference = true
+        referenceError = nil
+        defer { isLoadingReference = false }
+
+        do {
+            let loaded = try await catalogService.enrichExerciseIfNeeded(exercise, in: modelContext)
+            if !loaded, mediaURL == nil {
+                referenceError = "No movement reference is available yet."
+            }
+        } catch is CancellationError {
+            return
+        } catch {
+            referenceError = "Couldn’t load the movement reference."
+        }
     }
 
     @ViewBuilder
@@ -225,28 +659,29 @@ struct ExerciseDetailView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(instructionSteps.enumerated()), id: \.offset) { index, step in
                         HStack(alignment: .top, spacing: 14) {
+                            Text("\(index + 1)")
+                                .font(.caption.bold().monospacedDigit())
+                                .foregroundStyle(.white)
+                                .frame(width: 28, height: 28)
+                                .background(Color.accentColor, in: Circle())
+                                .accessibilityHidden(true)
+
                             Button {
                                 ExerciseStepSpeechService.shared.speakStep(number: index + 1, text: step)
                             } label: {
-                                Text("\(index + 1)")
-                                    .font(.caption.bold().monospacedDigit())
-                                    .foregroundStyle(.white)
-                                    .frame(width: 28, height: 28)
-                                    .background(Color.accentColor, in: Circle())
+                                Text(step)
+                                    .font(.body)
+                                    .foregroundStyle(.primary)
+                                    .lineSpacing(4)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
-                            .accessibilityLabel("Speak step \(index + 1)")
-
-                            Text(step)
-                                .font(.body)
-                                .foregroundStyle(.primary)
-                                .lineSpacing(4)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                            .accessibilityLabel("Read step \(index + 1): \(step)")
+                            .accessibilityHint("Reads this instruction aloud")
                         }
                         .padding(.vertical, 12)
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel("Step \(index + 1), \(step)")
 
                         if index < instructionSteps.count - 1 {
                             Divider()
@@ -266,6 +701,31 @@ struct ExerciseDetailView: View {
         .repSurface(cornerRadius: RepVisualSystem.cardRadius)
     }
 
+    private func helpVideoLink(_ url: URL) -> some View {
+        Link(destination: url) {
+            HStack(spacing: 10) {
+                Image(systemName: "play.rectangle")
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Watch video breakdown")
+                        .font(.subheadline.weight(.semibold))
+                    if let helpVideoChannel {
+                        Text(helpVideoChannel)
+                            .font(.caption)
+                            .repSecondaryText()
+                    }
+                }
+                Spacer()
+                Image(systemName: "arrow.up.right")
+                    .font(.caption.weight(.semibold))
+            }
+            .padding()
+            .repSurface(cornerRadius: RepVisualSystem.controlRadius)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Watch video breakdown on YouTube")
+        .accessibilityHint("Opens the reviewed technique video externally")
+    }
+
     private func notes(_ value: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Notes")
@@ -278,5 +738,11 @@ struct ExerciseDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .repSurface(cornerRadius: RepVisualSystem.cardRadius)
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
     }
 }

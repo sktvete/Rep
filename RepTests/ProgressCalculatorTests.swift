@@ -18,6 +18,8 @@ struct ProgressCalculatorTests {
         #expect(ProgressCalculator.estimatedOneRepMax(weight: 100, repetitions: -2) == nil)
         #expect(ProgressCalculator.estimatedOneRepMax(weight: 100, repetitions: 16) == nil)
         #expect(ProgressCalculator.estimatedOneRepMax(weight: 0, repetitions: 5) == nil)
+        #expect(ProgressCalculator.estimatedOneRepMax(weight: .infinity, repetitions: 5) == nil)
+        #expect(ProgressCalculator.estimatedOneRepMax(weight: .nan, repetitions: 5) == nil)
     }
 
     @Test("Volume is only calculated for applicable measurement types")
@@ -26,6 +28,8 @@ struct ProgressCalculatorTests {
         #expect(ProgressCalculator.volume(weight: 80, repetitions: 5, measurementType: .bodyweightAndRepetitions) == nil)
         #expect(ProgressCalculator.volume(weight: 20, repetitions: 10, measurementType: .assistedBodyweight) == nil)
         #expect(ProgressCalculator.volume(weight: 80, repetitions: 0, measurementType: .weightAndRepetitions) == nil)
+        #expect(ProgressCalculator.volume(weight: .infinity, repetitions: 5, measurementType: .weightAndRepetitions) == nil)
+        #expect(ProgressCalculator.volume(weight: .nan, repetitions: 5, measurementType: .weightAndRepetitions) == nil)
     }
 
     @Test("Personal records include weight, repetitions, 1RM, set volume, and workout volume")
@@ -213,6 +217,20 @@ struct ProgressCalculatorTests {
         #expect(domain!.lowerBound < 82)
         #expect(domain!.upperBound > 95)
         #expect(domain!.upperBound - domain!.lowerBound < 30)
+    }
+
+    @Test("Chart scale ignores corrupt persisted values")
+    func chartScaleRejectsNonFiniteValues() {
+        let domain = ProgressChartScale.niceYDomain(
+            for: [.nan, -.infinity, -20, 82, .infinity, 95],
+            minimumPadding: 2.5
+        )
+        #expect(domain != nil)
+        #expect(domain!.lowerBound.isFinite)
+        #expect(domain!.upperBound.isFinite)
+        #expect(domain!.contains(82))
+        #expect(domain!.contains(95))
+        #expect(ProgressChartScale.niceYDomain(for: [.nan, .infinity, -1]) == nil)
     }
 
     @Test("Day stride adapts to chart span")

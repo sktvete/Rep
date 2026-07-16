@@ -17,6 +17,7 @@ struct WorkoutCreationService {
             name: routine.name,
             startedAt: startedAt,
             state: .active,
+            routineColorPreset: routine.colorPreset,
             notes: routine.notes
         )
 

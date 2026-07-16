@@ -21,6 +21,7 @@ struct LegacyExerciseDBDataRemovalSummary: Equatable, Sendable {
 @MainActor
 enum LegacyExerciseDBDataRemovalService {
     static let unavailableLegacyExerciseName = "Unavailable legacy exercise"
+    static let migrationKey = "rep.exerciseCatalog.removedExerciseDBData.v1"
 
     @discardableResult
     static func removeUnlicensedData(
@@ -28,7 +29,11 @@ enum LegacyExerciseDBDataRemovalService {
         defaults: UserDefaults = .standard,
         clearSharedCaches: Bool = true
     ) async throws -> LegacyExerciseDBDataRemovalSummary {
-        await clearProviderCheckpointsAndCachesIfNeeded(
+        guard !defaults.bool(forKey: migrationKey) else {
+            return emptySummary
+        }
+
+        await clearProviderCheckpointsAndCaches(
             defaults: defaults,
             clearSharedCaches: clearSharedCaches
         )
@@ -36,13 +41,8 @@ enum LegacyExerciseDBDataRemovalService {
         let exercises = try context.fetch(FetchDescriptor<Exercise>())
         let legacy = exercises.filter(isLegacyExerciseDBRecord)
         guard !legacy.isEmpty else {
-            return LegacyExerciseDBDataRemovalSummary(
-                convertedToBundledCatalog: 0,
-                retainedCustomExercises: 0,
-                clearedAmbiguousCustomNotes: 0,
-                retainedUserReferences: 0,
-                deletedUnreferencedExercises: 0
-            )
+            defaults.set(true, forKey: migrationKey)
+            return emptySummary
         }
 
         let routineExercises = try context.fetch(FetchDescriptor<RoutineExercise>())
@@ -99,6 +99,7 @@ enum LegacyExerciseDBDataRemovalService {
             }
 
             try context.save()
+            defaults.set(true, forKey: migrationKey)
         } catch {
             context.rollback()
             throw error
@@ -110,6 +111,16 @@ enum LegacyExerciseDBDataRemovalService {
             clearedAmbiguousCustomNotes: clearedAmbiguousCustomNotes,
             retainedUserReferences: retainedUserReferences,
             deletedUnreferencedExercises: deletedUnreferencedExercises
+        )
+    }
+
+    private static var emptySummary: LegacyExerciseDBDataRemovalSummary {
+        LegacyExerciseDBDataRemovalSummary(
+            convertedToBundledCatalog: 0,
+            retainedCustomExercises: 0,
+            clearedAmbiguousCustomNotes: 0,
+            retainedUserReferences: 0,
+            deletedUnreferencedExercises: 0
         )
     }
 
@@ -141,13 +152,10 @@ private extension LegacyExerciseDBDataRemovalService {
         exercise.touch()
     }
 
-    static func clearProviderCheckpointsAndCachesIfNeeded(
+    static func clearProviderCheckpointsAndCaches(
         defaults: UserDefaults,
         clearSharedCaches: Bool
     ) async {
-        let migrationKey = "rep.exerciseCatalog.removedExerciseDBData.v1"
-        guard !defaults.bool(forKey: migrationKey) else { return }
-
         for suffix in [
             "isComplete",
             "nextCursor",
@@ -170,6 +178,5 @@ private extension LegacyExerciseDBDataRemovalService {
                 }
             }
         }
-        defaults.set(true, forKey: migrationKey)
     }
 }

@@ -84,7 +84,7 @@ final class ExerciseProgressModel {
                     sessionID: session.id,
                     date: session.completedAt ?? session.startedAt,
                     estimatedOneRepMax: completedSets.compactMap(Self.estimatedOneRepMax).max(),
-                    bestWeight: completedSets.compactMap(\.weight).max(),
+                    bestWeight: completedSets.compactMap(Self.validWeight).max(),
                     completedSetCount: completedSets.count
                 )
             )
@@ -182,16 +182,23 @@ final class ExerciseProgressModel {
 
         var recentChange = "—"
         if let latestOneRepMax = latestChart?.estimatedOneRepMax,
-           let previousOneRepMax = previousChart?.estimatedOneRepMax {
+           let previousOneRepMax = previousChart?.estimatedOneRepMax,
+           latestOneRepMax.isFinite,
+           previousOneRepMax.isFinite {
             let difference = latestOneRepMax - previousOneRepMax
             let displayDifference = UnitConversion.weight(difference, from: .kilograms, to: preferredUnit)
-            let prefix = difference > 0 ? "+" : ""
-            recentChange = "\(prefix)\(displayDifference.formatted(.number.precision(.fractionLength(0...1)))) \(preferredUnit.symbol)"
+            if difference.isFinite, displayDifference.isFinite {
+                let prefix = difference > 0 ? "+" : ""
+                recentChange = "\(prefix)\(displayDifference.formatted(.number.precision(.fractionLength(0...1)))) \(preferredUnit.symbol)"
+            }
         }
 
         return ExerciseProgressMetrics(
-            bestWeight: sets.compactMap(\.weight).max(),
-            bestRepetitions: sets.compactMap(\.repetitions).max(),
+            bestWeight: sets.compactMap(validWeight).max(),
+            bestRepetitions: sets.compactMap { set in
+                guard let repetitions = set.repetitions, repetitions > 0 else { return nil }
+                return repetitions
+            }.max(),
             bestEstimatedOneRepMax: sets.compactMap(estimatedOneRepMax).max(),
             totalSets: sets.count,
             sessionsInRange: sessionPoints.count,
@@ -203,6 +210,11 @@ final class ExerciseProgressModel {
 
     private static func estimatedOneRepMax(for set: WorkoutSet) -> Double? {
         ProgressCalculator.estimatedOneRepMax(weight: set.weight, repetitions: set.repetitions)
+    }
+
+    private static func validWeight(for set: WorkoutSet) -> Double? {
+        guard let weight = set.weight, weight.isFinite, weight >= 0 else { return nil }
+        return weight
     }
 
     private func catalogSignature(for sessions: [WorkoutSession]) -> UInt64 {

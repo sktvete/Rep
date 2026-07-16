@@ -5,24 +5,34 @@ enum ProgressChartScale {
         for values: [Double],
         minimumPadding: Double = 1
     ) -> ClosedRange<Double>? {
-        guard let rawMin = values.min(), let rawMax = values.max() else { return nil }
+        let validValues = values.filter { $0.isFinite && $0 >= 0 }
+        guard let rawMin = validValues.min(), let rawMax = validValues.max() else { return nil }
+        let safeMinimumPadding = minimumPadding.isFinite ? max(minimumPadding, 0) : 1
 
         if rawMin == rawMax {
-            let pad = max(minimumPadding, abs(rawMin) * 0.05, 1)
-            return (rawMin - pad)...(rawMax + pad)
+            let pad = max(safeMinimumPadding, abs(rawMin) * 0.05, 1)
+            let lower = rawMin - pad
+            let upper = rawMax + pad
+            guard lower.isFinite, upper.isFinite, lower < upper else { return nil }
+            return lower...upper
         }
 
         let span = rawMax - rawMin
-        let pad = max(span * 0.12, minimumPadding)
-        let step = niceStep(for: span + (pad * 2))
+        guard span.isFinite, span > 0 else { return nil }
+        let pad = max(span * 0.12, safeMinimumPadding)
+        let paddedSpan = span + (pad * 2)
+        guard pad.isFinite, paddedSpan.isFinite else { return nil }
+        let step = niceStep(for: paddedSpan)
         let lower = floor((rawMin - pad) / step) * step
         let upper = ceil((rawMax + pad) / step) * step
-        guard lower < upper else { return (rawMin - pad)...(rawMax + pad) }
+        guard lower.isFinite, upper.isFinite else { return nil }
+        guard lower < upper else { return nil }
         return lower...upper
     }
 
     static func axisStride(for domain: ClosedRange<Double>) -> Double {
-        niceStep(for: domain.upperBound - domain.lowerBound)
+        let span = domain.upperBound - domain.lowerBound
+        return span.isFinite ? niceStep(for: span) : 1
     }
 
     static func dayStride(for dates: [Date], calendar: Calendar = .autoupdatingCurrent) -> Int {
@@ -42,9 +52,10 @@ enum ProgressChartScale {
     }
 
     private static func niceStep(for span: Double) -> Double {
-        guard span > 0 else { return 1 }
+        guard span.isFinite, span > 0 else { return 1 }
         let rough = span / 4
         let magnitude = pow(10, floor(log10(rough)))
+        guard magnitude.isFinite, magnitude > 0 else { return 1 }
         let normalized = rough / magnitude
         let nice: Double
         if normalized <= 1 { nice = 1 }

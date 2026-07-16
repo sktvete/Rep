@@ -7,6 +7,28 @@ enum RepVisualSystem {
     static let pageSpacing: CGFloat = 20
 }
 
+private struct RepMainNavigationTitleModifier: ViewModifier {
+    let title: String
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+                .navigationTitle(title)
+                .toolbar {
+                    ToolbarItem(placement: .largeTitle) {
+                        Text(title)
+                            .font(.largeTitle.bold())
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.leading, 8)
+                    }
+                }
+        } else {
+            content.navigationTitle(title)
+        }
+    }
+}
+
 struct RepScreenBackground: View {
     @Environment(\.repThemeSettings) private var themeSettings
     @Environment(\.colorScheme) private var colorScheme
@@ -45,6 +67,8 @@ private struct RepSurfaceModifier: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
 
     let cornerRadius: CGFloat
+    let shadowRadius: CGFloat
+    let shadowY: CGFloat
 
     private var theme: RepTheme {
         themeSettings.resolved(for: colorScheme)
@@ -55,7 +79,7 @@ private struct RepSurfaceModifier: ViewModifier {
             .background {
                 theme.surfaceColor
                     .clipShape(.rect(cornerRadius: cornerRadius))
-                    .shadow(color: theme.backdropShadow, radius: 10, x: 0, y: 4)
+                    .shadow(color: theme.backdropShadow, radius: shadowRadius, x: 0, y: shadowY)
             }
             .overlay {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -211,12 +235,26 @@ struct RepSectionHeader: View {
 }
 
 extension View {
+    func repMainNavigationTitle(_ title: String) -> some View {
+        modifier(RepMainNavigationTitleModifier(title: title))
+    }
+
     func repSecondaryText() -> some View {
         modifier(RepSecondaryTextModifier())
     }
 
-    func repSurface(cornerRadius: CGFloat = RepVisualSystem.cardRadius) -> some View {
-        modifier(RepSurfaceModifier(cornerRadius: cornerRadius))
+    func repSurface(
+        cornerRadius: CGFloat = RepVisualSystem.cardRadius,
+        shadowRadius: CGFloat = 10,
+        shadowY: CGFloat = 4
+    ) -> some View {
+        modifier(
+            RepSurfaceModifier(
+                cornerRadius: cornerRadius,
+                shadowRadius: shadowRadius,
+                shadowY: shadowY
+            )
+        )
     }
 
     func repThemedListRow(

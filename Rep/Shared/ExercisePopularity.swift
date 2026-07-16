@@ -83,7 +83,6 @@ enum ExercisePopularity {
         "Sumo Deadlift",
         "Kettlebell Swing",
         "One-Arm Dumbbell Row",
-        "Chest-Supported Row",
         "Reverse Pec Deck",
         "Cable Lateral Raise",
         "Cable Glute Kickback",
@@ -91,7 +90,6 @@ enum ExercisePopularity {
         "Ab Wheel Rollout",
         "Weighted Pull-Up",
         "Smith Machine Squat",
-        "Smith Machine Bench Press",
         "Assisted Dip"
     ]
 }

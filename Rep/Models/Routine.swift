@@ -10,8 +10,19 @@ final class Routine {
     var updatedAt: Date
     var lastPerformedAt: Date?
     var isArchived: Bool
+    // Optional so stores created before routine colors can migrate without a
+    // custom schema stage. Existing routines resolve to the default below.
+    var colorPresetRaw: String?
     @Relationship(deleteRule: .cascade, inverse: \RoutineExercise.routine)
     var exercises: [RoutineExercise]
+
+    var colorPreset: RoutineColorPreset {
+        get { colorPresetRaw.flatMap(RoutineColorPreset.init(rawValue:)) ?? .blue }
+        set {
+            colorPresetRaw = newValue.rawValue
+            updatedAt = .now
+        }
+    }
 
     var orderedExercises: [RoutineExercise] {
         exercises.sorted { lhs, rhs in
@@ -29,6 +40,7 @@ final class Routine {
         updatedAt: Date? = nil,
         lastPerformedAt: Date? = nil,
         isArchived: Bool = false,
+        colorPreset: RoutineColorPreset = .blue,
         exercises: [RoutineExercise] = []
     ) {
         self.id = id
@@ -38,6 +50,7 @@ final class Routine {
         self.updatedAt = updatedAt ?? createdAt
         self.lastPerformedAt = lastPerformedAt
         self.isArchived = isArchived
+        colorPresetRaw = colorPreset.rawValue
         self.exercises = exercises
         normalizeExerciseOrder()
     }

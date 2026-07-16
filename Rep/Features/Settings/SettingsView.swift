@@ -30,7 +30,7 @@ struct SettingsView: View {
                     .task { ensureSettingsExist() }
                 }
             }
-            .navigationTitle("Settings")
+            .repMainNavigationTitle("Settings")
             .confirmationDialog(
                 sampleDataAction?.title ?? "Sample Data",
                 isPresented: Binding(
@@ -114,6 +114,7 @@ private struct SettingsForm: View {
     @State private var saveError: String?
     @State private var persistTask: Task<Void, Never>?
     @State private var draftTheme = RepThemeSettings()
+    @State private var isShowingDiagnostics = false
 
     var body: some View {
         Form {
@@ -257,12 +258,24 @@ private struct SettingsForm: View {
                     Button("Start 5 Second Rest Timer", systemImage: "timer") {
                         RestTimerDevTools.startFiveSecondTimer(hapticsEnabled: settings.hapticsEnabled)
                     }
+
+                    Divider().padding(.vertical, 12)
+
+                    Button("Clear Caches", systemImage: "externaldrive.badge.xmark") {
+                        DevCacheTools.clearCaches(in: modelContext)
+                    }
+
+                    Divider().padding(.vertical, 12)
+
+                    Button("Crash Diagnostics", systemImage: "doc.text.magnifyingglass") {
+                        isShowingDiagnostics = true
+                    }
                 }
                 .repThemedListSection()
             } header: {
                 RepSectionHeader(title: "Development")
             } footer: {
-                Text("Adds local routines, workout history, bodyweight entries, and an active recovery example. Rest timer tests use the active workout when one is open, otherwise the Dynamic Island only.")
+                Text("Crash Diagnostics stores local navigation breadcrumbs, save errors, and post-crash reports delivered by MetricKit.")
             }
 #endif
 
@@ -327,6 +340,9 @@ private struct SettingsForm: View {
         .repThemedList()
         .background(RepScreenBackground())
         .environment(\.repThemeSettings, draftTheme)
+        .sheet(isPresented: $isShowingDiagnostics) {
+            DeveloperDiagnosticsView()
+        }
         .onAppear {
             draftTheme = RepThemeSettings(settings: settings)
         }
@@ -401,6 +417,117 @@ private struct SettingsForm: View {
             try modelContext.save()
         } catch {
             saveError = error.localizedDescription
+        }
+    }
+}
+
+private struct DeveloperDiagnosticsView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var contents = ""
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+    @State private var copied = false
+
+    private var hasEntries: Bool {
+        !contents.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if isLoading {
+                    ProgressView("Loading diagnostics…")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if let errorMessage {
+                    ContentUnavailableView(
+                        "Couldn’t read diagnostics",
+                        systemImage: "exclamationmark.triangle",
+                        description: Text(errorMessage)
+                    )
+                } else if hasEntries {
+                    ScrollView {
+                        Text(contents)
+                            .font(.caption.monospaced())
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding()
+                    }
+                    .safeAreaInset(edge: .bottom) {
+                        HStack(spacing: 12) {
+                            Button {
+                                UIPasteboard.general.string = contents
+                                copied = true
+                            } label: {
+                                Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
+                            }
+                            .buttonStyle(.bordered)
+
+                            ShareLink(
+                                item: DeveloperDiagnosticsStore.fileURL,
+                                preview: SharePreview("Rep Diagnostics")
+                            ) {
+                                Label("Export", systemImage: "square.and.arrow.up")
+                            }
+                            .buttonStyle(.borderedProminent)
+
+                            Button("Clear", systemImage: "trash", role: .destructive) {
+                                clear()
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(.bar)
+                    }
+                } else {
+                    ContentUnavailableView(
+                        "No stored diagnostics",
+                        systemImage: "checkmark.circle",
+                        description: Text("Breadcrumbs and MetricKit crash reports will appear here.")
+                    )
+                }
+            }
+            .navigationTitle("Crash Diagnostics")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { dismiss() }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Refresh", systemImage: "arrow.clockwise") {
+                        Task { await reload() }
+                    }
+                }
+            }
+            .task {
+                DeveloperDiagnosticsService.shared.start()
+                await reload()
+            }
+        }
+    }
+
+    private func reload() async {
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            contents = try await DeveloperDiagnosticsStore.shared.contents()
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func clear() {
+        Task {
+            do {
+                try await DeveloperDiagnosticsStore.shared.clear()
+                contents = ""
+                errorMessage = nil
+                copied = false
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 }

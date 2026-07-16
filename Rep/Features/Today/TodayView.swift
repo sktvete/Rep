@@ -60,7 +60,7 @@ struct TodayView: View {
                 .scrollIndicators(.hidden)
                 .repSoftScrollEdges()
             }
-            .navigationTitle("Today")
+            .repMainNavigationTitle("Today")
             .sheet(isPresented: $isChoosingRoutine) {
                 RoutineStartPicker(routines: activeRoutines) { routine in
                     isChoosingRoutine = false
@@ -380,7 +380,11 @@ private struct RoutineStartPicker: View {
                         Button {
                             onSelect(routine)
                         } label: {
-                            HStack {
+                            HStack(spacing: 12) {
+                                Circle()
+                                    .fill(routine.colorPreset.color)
+                                    .frame(width: 12, height: 12)
+                                    .accessibilityHidden(true)
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(routine.name)
                                     Text("\(routine.exercises.count) exercises")

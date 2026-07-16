@@ -14,12 +14,13 @@ final class ExercisePickerSearchModel {
 
     private let index = ExerciseSearchIndex()
     private var searchTask: Task<Void, Never>?
+    private var searchGeneration: UInt64 = 0
     private var catalogKey: UInt64 = 0
     private var usage: [UUID: Int] = [:]
 
     static let browseLimit = 120
     static let searchLimit = 150
-    static let searchDebounce: Duration = .milliseconds(200)
+    static let searchDebounce: Duration = .milliseconds(300)
 
     func setUsage(_ usage: [UUID: Int]) {
         guard self.usage != usage else { return }
@@ -28,7 +29,7 @@ final class ExercisePickerSearchModel {
     }
 
     func prewarm(exercises: [Exercise]) {
-        let available = exercises.filter { !$0.isArchived }
+        let available = availableExercises(from: exercises)
         index.prewarm(for: available)
     }
 
@@ -37,7 +38,7 @@ final class ExercisePickerSearchModel {
         query: String,
         immediate: Bool = false
     ) {
-        let available = exercises.filter { !$0.isArchived }
+        let available = availableExercises(from: exercises)
         let key = catalogKey(for: available)
         if key != catalogKey {
             catalogKey = key
@@ -45,7 +46,10 @@ final class ExercisePickerSearchModel {
             index.prewarm(for: available)
         }
 
+        searchGeneration &+= 1
+        let generation = searchGeneration
         searchTask?.cancel()
+        isRefreshing = false
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if trimmed.isEmpty {
@@ -65,25 +69,53 @@ final class ExercisePickerSearchModel {
         let searchLimit = Self.searchLimit
 
         searchTask = Task {
-            if delay > .zero {
-                try? await Task.sleep(for: delay)
+            do {
+                if delay > .zero {
+                    try await Task.sleep(for: delay)
+                }
+                try Task.checkCancellation()
+                guard generation == searchGeneration else { return }
+
+                isRefreshing = true
+                let worker = Task.detached(priority: .userInitiated) {
+                    try ExerciseSearchEngine.searchIDsCancellable(
+                        candidates,
+                        query: trimmed,
+                        usage: usageCopy,
+                        limit: searchLimit
+                    )
+                }
+                let rankedIDs = try await withTaskCancellationHandler {
+                    try await worker.value
+                } onCancel: {
+                    worker.cancel()
+                }
+                try Task.checkCancellation()
+                guard generation == searchGeneration else { return }
+
+                displayed = rankedIDs.compactMap { exerciseByID[$0] }
+                isRefreshing = false
+            } catch is CancellationError {
+                if generation == searchGeneration {
+                    isRefreshing = false
+                }
+            } catch {
+                if generation == searchGeneration {
+                    isRefreshing = false
+                }
             }
-            guard !Task.isCancelled else { return }
-
-            isRefreshing = true
-            let rankedIDs = await Task.detached(priority: .userInitiated) {
-                ExerciseSearchEngine.searchIDs(
-                    candidates,
-                    query: trimmed,
-                    usage: usageCopy,
-                    limit: searchLimit
-                )
-            }.value
-            guard !Task.isCancelled else { return }
-
-            displayed = rankedIDs.compactMap { exerciseByID[$0] }
-            isRefreshing = false
         }
+    }
+
+    func reset() {
+        searchGeneration &+= 1
+        searchTask?.cancel()
+        displayed = []
+        isRefreshing = false
+        catalogKey = 0
+        usage = [:]
+        index.rebuildDocuments(for: [])
+        index.invalidateBrowseOrder()
     }
 
     private func catalogKey(for exercises: [Exercise]) -> UInt64 {
@@ -93,5 +125,12 @@ final class ExercisePickerSearchModel {
             hasher.combine(newest.updatedAt)
         }
         return UInt64(bitPattern: Int64(hasher.finalize()))
+    }
+
+    private func availableExercises(from exercises: [Exercise]) -> [Exercise] {
+        ExerciseCatalogIdentity.deduplicated(
+            exercises.filter { !$0.isArchived },
+            usage: usage
+        )
     }
 }

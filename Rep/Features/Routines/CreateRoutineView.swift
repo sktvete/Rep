@@ -7,6 +7,7 @@ struct CreateRoutineView: View {
 
     @State private var name = ""
     @State private var notes = ""
+    @State private var colorPreset: RoutineColorPreset = .blue
     @State private var selectedExercises: [Exercise] = []
     @State private var isChoosingExercise = false
     @State private var saveError: String?
@@ -29,6 +30,13 @@ struct CreateRoutineView: View {
 
                         TextField("Notes (optional)", text: $notes, axis: .vertical)
                             .lineLimit(2...5)
+
+                        Divider().padding(.vertical, 12)
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            Label("Color", systemImage: "paintpalette")
+                            RoutineColorPicker(selection: $colorPreset)
+                        }
                     }
                     .repThemedListSection()
                 } header: {
@@ -36,9 +44,9 @@ struct CreateRoutineView: View {
                 }
 
                 Section {
-                    ForEach(selectedExercises) { exercise in
+                    ForEach(Array(selectedExercises.enumerated()), id: \.element.id) { index, exercise in
                         HStack(spacing: 12) {
-                            ExerciseMediaThumbnail(exercise: exercise, size: 34)
+                            ExerciseMediaThumbnail(exercise: exercise, size: 34, listIndex: index)
                             Text(exercise.name)
                                 .fontWeight(.medium)
                         }
@@ -65,6 +73,9 @@ struct CreateRoutineView: View {
             }
             .repThemedList()
             .background(RepScreenBackground())
+            .exerciseThumbnailScope {
+                ExerciseThumbnailPrefetch.sources(from: selectedExercises, thumbnailSize: 34)
+            }
             .navigationTitle("New Routine")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -97,7 +108,8 @@ struct CreateRoutineView: View {
     private func createRoutine() {
         let routine = Routine(
             name: name.trimmingCharacters(in: .whitespacesAndNewlines),
-            notes: notes.trimmingCharacters(in: .whitespacesAndNewlines)
+            notes: notes.trimmingCharacters(in: .whitespacesAndNewlines),
+            colorPreset: colorPreset
         )
         selectedExercises.enumerated().forEach { index, exercise in
             routine.appendExercise(RoutineExercise(

@@ -9,7 +9,14 @@ struct ExercisePickerView: View {
     @State private var searchText = ""
     @State private var isCreatingExercise = false
     @State private var detailExercise: Exercise?
+    @State private var catalogService = ExerciseDBCatalogService()
+    @State private var catalogSearchError: String?
+    @State private var remoteSearchTask: Task<Void, Never>?
+    @State private var remoteSearchGeneration: UInt64 = 0
+    @State private var isRemoteSearching = false
+    @State private var thumbnailsEnabled = false
     @State private var prepareTask: Task<Void, Never>?
+    @State private var thumbnailTask: Task<Void, Never>?
 
     private var searchModel: ExercisePickerSearchModel { ExercisePickerSessionCache.searchModel }
 
@@ -35,9 +42,11 @@ struct ExercisePickerView: View {
                     ContentUnavailableView.search(text: searchText)
                 } else {
                     List {
-                        ForEach(searchModel.displayed) { exercise in
+                        ForEach(Array(searchModel.displayed.enumerated()), id: \.element.id) { index, exercise in
                             ExercisePickerRow(
                                 exercise: exercise,
+                                loadsImages: thumbnailsEnabled,
+                                listIndex: index,
                                 onSelect: { onSelect(exercise) },
                                 onShowDetails: { detailExercise = exercise }
                             )
@@ -59,7 +68,14 @@ struct ExercisePickerView: View {
             .background(RepScreenBackground())
             .navigationTitle("Choose Exercise")
             .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $searchText, prompt: "Name, nickname, muscle, or equipment")
+            .searchable(
+                text: $searchText,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "Name, nickname, muscle, or equipment"
+            )
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                catalogStatus
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -78,17 +94,33 @@ struct ExercisePickerView: View {
             .sheet(item: $detailExercise) { exercise in
                 ExerciseDetailView(exercise: exercise)
             }
+            .exerciseThumbnailScope {
+                ExerciseThumbnailPrefetch.sources(from: searchModel.displayed, thumbnailSize: 58)
+            }
             .onAppear {
+                ExercisePickerThumbnailGate.disableThumbnails(&thumbnailsEnabled, task: &thumbnailTask)
                 schedulePrepare()
             }
             .onDisappear {
                 prepareTask?.cancel()
+                remoteSearchGeneration &+= 1
+                remoteSearchTask?.cancel()
+                isRemoteSearching = false
+                ExercisePickerThumbnailGate.disableThumbnails(&thumbnailsEnabled, task: &thumbnailTask)
             }
             .onChange(of: searchText) { _, newValue in
                 ExercisePickerSessionCache.prepare(
                     exercises: exercises,
                     query: newValue,
                     in: modelContext
+                )
+                scheduleRemoteSearch(for: newValue)
+            }
+            .onChange(of: searchModel.isRefreshing) { _, isRefreshing in
+                ExercisePickerThumbnailGate.scheduleReveal(
+                    thumbnailsEnabled: $thumbnailsEnabled,
+                    isSearching: isRefreshing,
+                    task: &thumbnailTask
                 )
             }
             .onChange(of: exerciseCatalogSignature) { _, _ in
@@ -111,6 +143,12 @@ struct ExercisePickerView: View {
                 query: searchText,
                 in: modelContext
             )
+            guard !Task.isCancelled else { return }
+            ExercisePickerThumbnailGate.scheduleReveal(
+                thumbnailsEnabled: $thumbnailsEnabled,
+                isSearching: searchModel.isRefreshing,
+                task: &thumbnailTask
+            )
         }
     }
 
@@ -124,4 +162,77 @@ struct ExercisePickerView: View {
         return hasher.finalize()
     }
 
+    @ViewBuilder
+    private var catalogStatus: some View {
+        let status = catalogStatusValues
+        if status.isLoading || status.errorMessage != nil {
+            ExerciseCatalogStatusView(
+                isLoading: status.isLoading,
+                progress: status.progress,
+                errorMessage: status.errorMessage,
+                onRetry: {
+                    scheduleRemoteSearch(for: searchText, immediate: true)
+                }
+            )
+            .padding(.horizontal)
+            .padding(.vertical, 10)
+            .background(.bar)
+        }
+    }
+
+    private var catalogStatusValues: (isLoading: Bool, progress: Double?, errorMessage: String?) {
+        switch catalogService.state {
+        case .syncing(let progress):
+            (true, progress.totalItems > 0 ? progress.fractionCompleted : nil, nil)
+        case .failed(let message):
+            (isRemoteSearching, nil, catalogSearchError ?? message)
+        case .idle, .complete:
+            (isRemoteSearching, nil, catalogSearchError)
+        }
+    }
+
+    private func scheduleRemoteSearch(for query: String, immediate: Bool = false) {
+        remoteSearchGeneration &+= 1
+        let generation = remoteSearchGeneration
+        remoteSearchTask?.cancel()
+        isRemoteSearching = false
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 3 else {
+            catalogSearchError = nil
+            return
+        }
+
+        remoteSearchTask = Task {
+            do {
+                if !immediate {
+                    try await Task.sleep(for: .milliseconds(300))
+                }
+                try Task.checkCancellation()
+                guard generation == remoteSearchGeneration else { return }
+                isRemoteSearching = true
+
+                _ = try await catalogService.searchAndImport(query: trimmed, in: modelContext)
+                try Task.checkCancellation()
+                guard generation == remoteSearchGeneration,
+                      trimmed == searchText.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
+
+                catalogSearchError = nil
+                ExercisePickerSessionCache.prepare(
+                    exercises: exercises,
+                    query: searchText,
+                    in: modelContext
+                )
+                isRemoteSearching = false
+            } catch is CancellationError {
+                if generation == remoteSearchGeneration {
+                    isRemoteSearching = false
+                }
+            } catch {
+                if generation == remoteSearchGeneration {
+                    isRemoteSearching = false
+                    catalogSearchError = "Online results aren’t available right now."
+                }
+            }
+        }
+    }
 }

@@ -29,14 +29,16 @@ struct TrainingProgressView: View {
                     switch selectedSection {
                     case .exercise:
                         ExerciseProgressView()
-                            .id(Section.exercise)
                     case .bodyweight:
                         BodyweightProgressView()
-                            .id(Section.bodyweight)
                     }
                 }
             }
-            .navigationTitle("Progress")
+            .repMainNavigationTitle("Progress")
+            .onAppear { AppLog.breadcrumb("Progress opened") }
+            .onChange(of: selectedSection) { _, section in
+                AppLog.breadcrumb("Progress section: \(section.rawValue)")
+            }
         }
     }
 }

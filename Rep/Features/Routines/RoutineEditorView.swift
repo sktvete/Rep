@@ -43,6 +43,19 @@ struct RoutineEditorView: View {
                     TextField("Notes (optional)", text: $routine.notes, axis: .vertical)
                         .lineLimit(2...5)
                         .onChange(of: routine.notes) { _, _ in scheduleKeepChanges() }
+
+                    Divider().padding(.vertical, 12)
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label("Color", systemImage: "paintpalette")
+                        RoutineColorPicker(selection: Binding(
+                            get: { routine.colorPreset },
+                            set: { preset in
+                                routine.colorPreset = preset
+                                scheduleKeepChanges()
+                            }
+                        ))
+                    }
                 }
                 .repThemedListSection()
             } header: {
@@ -59,11 +72,11 @@ struct RoutineEditorView: View {
                     .frame(maxWidth: .infinity)
                     .repThemedListSection(padding: 24)
                 } else {
-                    ForEach(orderedExercises) { item in
+                    ForEach(Array(orderedExercises.enumerated()), id: \.element.id) { index, item in
                         Button {
                             itemBeingConfigured = item
                         } label: {
-                            RoutineExerciseRow(item: item)
+                            RoutineExerciseRow(item: item, listIndex: index)
                         }
                         .buttonStyle(.plain)
                         .accessibilityHint("Opens set, repetition, and rest settings")
@@ -104,6 +117,12 @@ struct RoutineEditorView: View {
         }
         .repThemedList()
         .background(RepScreenBackground())
+        .exerciseThumbnailScope {
+            ExerciseThumbnailPrefetch.sources(
+                from: orderedExercises.compactMap(\.exercise),
+                thumbnailSize: 36
+            )
+        }
         .navigationTitle(routine.name.isEmpty ? "Routine" : routine.name)
         .navigationBarTitleDisplayMode(.inline)
         .onDisappear {
@@ -118,6 +137,7 @@ struct RoutineEditorView: View {
                         .font(.headline)
                 }
                 .repPrimaryButton()
+                .tint(routine.colorPreset.color)
                 .controlSize(.large)
                 .padding(.horizontal)
                 .padding(.vertical, 10)
@@ -215,11 +235,12 @@ struct RoutineEditorView: View {
 
 private struct RoutineExerciseRow: View {
     let item: RoutineExercise
+    var listIndex: Int? = nil
 
     var body: some View {
         HStack(spacing: 12) {
             if let exercise = item.exercise {
-                ExerciseMediaThumbnail(exercise: exercise, size: 36)
+                ExerciseMediaThumbnail(exercise: exercise, size: 36, listIndex: listIndex)
             } else {
                 Image(systemName: "dumbbell.fill")
                     .font(.subheadline.weight(.semibold))

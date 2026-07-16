@@ -90,7 +90,8 @@ final class UserSettings {
 }
 
 enum UserSettingsThemeMigration {
-    private static let currentThemeResetGeneration = 3
+    private static let editableColorsGeneration = 3
+    private static let currentThemeResetGeneration = 4
 
     static func resetColorsToDefaults(_ settings: UserSettings) {
         settings.setColorPalette(RepThemeDefaults.light, for: .light)
@@ -98,7 +99,9 @@ enum UserSettingsThemeMigration {
     }
 
     static func backfill(_ settings: UserSettings) {
-        if (settings.themeResetGeneration ?? 0) < currentThemeResetGeneration {
+        var generation = settings.themeResetGeneration ?? 0
+
+        if generation < editableColorsGeneration {
             let light = RepThemeDefaults.migratedPalette(
                 presetID: settings.lightThemePresetRaw,
                 colorScheme: .light
@@ -109,6 +112,14 @@ enum UserSettingsThemeMigration {
             )
             settings.setColorPalette(light, for: .light)
             settings.setColorPalette(dark, for: .dark)
+            generation = editableColorsGeneration
+            settings.themeResetGeneration = generation
+        }
+
+        if generation < currentThemeResetGeneration {
+            var light = settings.resolvedColorPalette(for: .light)
+            light.secondaryText = RepThemeDefaults.light.secondaryText
+            settings.setColorPalette(light, for: .light)
             settings.themeResetGeneration = currentThemeResetGeneration
         }
     }

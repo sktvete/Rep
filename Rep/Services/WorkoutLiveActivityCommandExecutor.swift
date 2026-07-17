@@ -64,6 +64,9 @@ enum WorkoutLiveActivityWorkoutCoordinator {
             after: completed,
             in: session
         ) ?? WorkoutLiveActivityStateBuilder.addAnotherSet(after: completed)
+        if next.exercise.id == completed.exercise.id {
+            WorkoutLiveActivityStateBuilder.prefillEmptyValues(on: next.set, from: completed.set)
+        }
         session.updatedAt = .now
         selectExercise(next.exercise.id, sessionID: session.id)
 
@@ -116,9 +119,78 @@ enum WorkoutLiveActivityWorkoutCoordinator {
 @MainActor
 enum WorkoutLiveActivityCommandExecutor {
     static func execute(_ command: WorkoutLiveActivityCommand) async throws {
-        let identifiers = command.identifiers
-        guard let sessionID = UUID(uuidString: identifiers.sessionID),
-              let setID = UUID(uuidString: identifiers.setID) else { return }
+        switch command {
+        case let .toggleRestPause(sessionID):
+            guard let sessionID = UUID(uuidString: sessionID) else { return }
+            if let timer = ActiveWorkoutRestTimerBridge.shared.presentedTimer,
+               timer.isPresented {
+                timer.togglePause()
+            } else {
+                await RestTimerLiveActivityManager.togglePauseFromIntent(sessionID: sessionID)
+            }
+            return
+
+        case let .adjustRest(sessionID, seconds):
+            guard let sessionID = UUID(uuidString: sessionID) else { return }
+            if let timer = ActiveWorkoutRestTimerBridge.shared.presentedTimer,
+               timer.isPresented {
+                timer.adjust(by: seconds)
+            } else {
+                await RestTimerLiveActivityManager.adjustFromIntent(
+                    sessionID: sessionID,
+                    by: seconds
+                )
+            }
+            return
+
+        case let .adjustWeight(sessionID, setID, delta):
+            try await mutateSet(sessionID: sessionID, setID: setID) { target, session, preferredUnit, context in
+                guard !target.set.isCompleted else { return }
+                adjustWeight(of: target, by: delta, preferredUnit: preferredUnit)
+                session.updatedAt = .now
+                try context.save()
+                await synchronize(target: target, session: session, preferredUnit: preferredUnit)
+            }
+
+        case let .adjustRepetitions(sessionID, setID, delta):
+            try await mutateSet(sessionID: sessionID, setID: setID) { target, session, preferredUnit, context in
+                guard !target.set.isCompleted else { return }
+                let adjusted = max(0, (target.set.repetitions ?? 0) + delta)
+                target.set.repetitions = adjusted == 0 ? nil : adjusted
+                target.set.updatedAt = .now
+                session.updatedAt = .now
+                try context.save()
+                await synchronize(target: target, session: session, preferredUnit: preferredUnit)
+            }
+
+        case let .completeSet(sessionID, setID):
+            try await complete(
+                sessionID: sessionID,
+                setID: setID,
+                preferSameExercise: false
+            )
+
+        case let .completeAnotherSet(sessionID, setID):
+            try await complete(
+                sessionID: sessionID,
+                setID: setID,
+                preferSameExercise: true
+            )
+        }
+    }
+
+    private static func mutateSet(
+        sessionID: String,
+        setID: String,
+        body: @MainActor (
+            WorkoutLiveActivityStateBuilder.Target,
+            WorkoutSession,
+            WeightUnit,
+            ModelContext
+        ) async throws -> Void
+    ) async throws {
+        guard let sessionID = UUID(uuidString: sessionID),
+              let setID = UUID(uuidString: setID) else { return }
 
         let context = try WorkoutLiveActivityWorkoutCoordinator.contextForIntent()
         let descriptor = FetchDescriptor<WorkoutSession>(
@@ -136,62 +208,82 @@ enum WorkoutLiveActivityCommandExecutor {
 
         let settings = try context.fetch(FetchDescriptor<UserSettings>()).first
         let preferredUnit = settings?.preferredWeightUnit ?? .kilograms
+        try await body(target, session, preferredUnit, context)
+    }
 
-        switch command {
-        case let .adjustWeight(_, _, delta):
-            guard !target.set.isCompleted else { return }
-            adjustWeight(
-                of: target,
-                by: delta,
-                preferredUnit: preferredUnit
-            )
+    private static func complete(
+        sessionID: String,
+        setID: String,
+        preferSameExercise: Bool
+    ) async throws {
+        guard let sessionUUID = UUID(uuidString: sessionID),
+              let setUUID = UUID(uuidString: setID) else { return }
+
+        let context = try WorkoutLiveActivityWorkoutCoordinator.contextForIntent()
+        let descriptor = FetchDescriptor<WorkoutSession>(
+            predicate: #Predicate { $0.id == sessionUUID }
+        )
+        guard let session = try context.fetch(descriptor).first,
+              session.state == .active,
+              let target = WorkoutLiveActivityStateBuilder.target(
+                setID: setUUID,
+                in: session
+              ) else {
+            RestTimerLiveActivityManager.end(sessionID: sessionUUID)
+            return
+        }
+
+        let settings = try context.fetch(FetchDescriptor<UserSettings>()).first
+        let preferredUnit = settings?.preferredWeightUnit ?? .kilograms
+
+        if !target.set.isCompleted {
+            target.set.markCompleted()
             session.updatedAt = .now
-            try context.save()
-            await synchronize(target: target, session: session, preferredUnit: preferredUnit)
+        }
 
-        case let .adjustRepetitions(_, _, delta):
-            guard !target.set.isCompleted else { return }
-            let adjusted = max(0, (target.set.repetitions ?? 0) + delta)
-            target.set.repetitions = adjusted == 0 ? nil : adjusted
-            target.set.updatedAt = .now
-            session.updatedAt = .now
-            try context.save()
-            await synchronize(target: target, session: session, preferredUnit: preferredUnit)
-
-        case .completeSet:
-            if !target.set.isCompleted {
-                target.set.markCompleted()
-                session.updatedAt = .now
-            }
-
-            let nextTarget = WorkoutLiveActivityStateBuilder.nextTarget(
+        let nextTarget: WorkoutLiveActivityStateBuilder.Target
+        if preferSameExercise {
+            nextTarget = WorkoutLiveActivityStateBuilder.nextTargetOnSameExercise(
+                after: target
+            ) ?? WorkoutLiveActivityStateBuilder.addAnotherSet(after: target)
+        } else {
+            nextTarget = WorkoutLiveActivityStateBuilder.nextTarget(
                 after: target,
                 in: session
             ) ?? WorkoutLiveActivityStateBuilder.addAnotherSet(after: target)
-            session.updatedAt = .now
-            try context.save()
+        }
 
-            WorkoutLiveActivityWorkoutCoordinator.selectExercise(
-                nextTarget.exercise.id,
-                sessionID: sessionID
+        if nextTarget.exercise.id == target.exercise.id {
+            WorkoutLiveActivityStateBuilder.prefillEmptyValues(
+                on: nextTarget.set,
+                from: target.set
             )
-            await synchronize(
-                target: nextTarget,
-                session: session,
-                preferredUnit: preferredUnit
-            )
+        }
+        session.updatedAt = .now
+        try context.save()
 
-            let restSeconds = target.exercise.defaultRestSeconds
-                ?? settings?.defaultRestSeconds
-                ?? 90
-            let nextLabel = WorkoutLiveActivityStateBuilder.targetLabel(nextTarget)
-            if let endDate = await RestTimerLiveActivityManager.startRestFromIntent(
-                sessionID: sessionID,
-                seconds: restSeconds,
-                nextExerciseName: nextLabel
-            ) {
-                RestTimerNotificationManager.schedule(sessionID: sessionID, at: endDate)
-            }
+        WorkoutLiveActivityWorkoutCoordinator.selectExercise(
+            nextTarget.exercise.id,
+            sessionID: sessionUUID
+        )
+        await synchronize(
+            target: nextTarget,
+            session: session,
+            preferredUnit: preferredUnit
+        )
+
+        let restSeconds = target.exercise.defaultRestSeconds
+            ?? settings?.defaultRestSeconds
+            ?? 90
+        let nextLabel = WorkoutLiveActivityStateBuilder.targetLabel(nextTarget)
+        if let timer = ActiveWorkoutRestTimerBridge.shared.presentedTimer {
+            timer.start(seconds: restSeconds, nextExerciseName: nextLabel)
+        } else if let endDate = await RestTimerLiveActivityManager.startRestFromIntent(
+            sessionID: sessionUUID,
+            seconds: restSeconds,
+            nextExerciseName: nextLabel
+        ) {
+            RestTimerNotificationManager.schedule(sessionID: sessionUUID, at: endDate)
         }
     }
 
@@ -281,12 +373,8 @@ enum WorkoutLiveActivityStateBuilder {
     }
 
     static func nextTarget(after target: Target, in session: WorkoutSession) -> Target? {
-        let sets = target.exercise.orderedSets
-        if let currentIndex = sets.firstIndex(where: { $0.id == target.set.id }) {
-            for set in sets.suffix(from: min(currentIndex + 1, sets.endIndex))
-            where !set.isCompleted {
-                return Target(exercise: target.exercise, set: set)
-            }
+        if let sameExercise = nextTargetOnSameExercise(after: target) {
+            return sameExercise
         }
 
         let exercises = session.orderedExercises
@@ -299,6 +387,31 @@ enum WorkoutLiveActivityStateBuilder {
             }
         }
         return nil
+    }
+
+    static func nextTargetOnSameExercise(after target: Target) -> Target? {
+        let sets = target.exercise.orderedSets
+        guard let currentIndex = sets.firstIndex(where: { $0.id == target.set.id }) else {
+            return nil
+        }
+        for set in sets.suffix(from: min(currentIndex + 1, sets.endIndex))
+        where !set.isCompleted {
+            return Target(exercise: target.exercise, set: set)
+        }
+        return nil
+    }
+
+    /// Copies performance fields onto `next` only when that field is empty, so a
+    /// planned set that already has values keeps them.
+    static func prefillEmptyValues(on next: WorkoutSet, from source: WorkoutSet) {
+        if next.weight == nil { next.weight = source.weight }
+        if next.repetitions == nil { next.repetitions = source.repetitions }
+        if next.durationSeconds == nil { next.durationSeconds = source.durationSeconds }
+        if next.distance == nil { next.distance = source.distance }
+        if next.assistanceWeight == nil { next.assistanceWeight = source.assistanceWeight }
+        if next.leftValue == nil { next.leftValue = source.leftValue }
+        if next.rightValue == nil { next.rightValue = source.rightValue }
+        next.updatedAt = .now
     }
 
     static func followingLabel(after target: Target, in session: WorkoutSession) -> String {
@@ -381,13 +494,3 @@ enum WorkoutLiveActivityStateBuilder {
     }
 }
 
-private extension WorkoutLiveActivityCommand {
-    var identifiers: (sessionID: String, setID: String) {
-        switch self {
-        case let .adjustWeight(sessionID, setID, _),
-             let .adjustRepetitions(sessionID, setID, _),
-             let .completeSet(sessionID, setID):
-            (sessionID, setID)
-        }
-    }
-}

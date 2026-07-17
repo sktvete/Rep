@@ -76,11 +76,11 @@ struct ExerciseProgressView: View {
     var body: some View {
         Group {
             if model.availableExercises.isEmpty {
-                ContentUnavailableView {
-                    Label("No exercise progress yet", systemImage: "chart.xyaxis.line")
-                } description: {
-                    Text("Complete a workout to start seeing strength trends.")
-                }
+                RepMascotEmptyState(
+                    pose: .empty,
+                    title: "No exercise progress yet",
+                    description: "Complete a workout to start seeing strength trends."
+                )
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: RepVisualSystem.pageSpacing) {

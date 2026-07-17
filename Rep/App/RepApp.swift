@@ -54,8 +54,6 @@ private enum AppTab: Int, CaseIterable {
 }
 
 private struct AppRootView: View {
-    private static let pageTransitionDuration: TimeInterval = 0.1
-
     @Environment(\.modelContext) private var modelContext
     @Environment(\.colorScheme) private var systemColorScheme
     @Query private var settings: [UserSettings]
@@ -65,6 +63,8 @@ private struct AppRootView: View {
     @State private var hasRestoredActiveWorkout = false
     @State private var isPreparingApp = true
     @State private var startupError: String?
+    @State private var pageDragOffset: CGFloat = 0
+    @State private var restTimerBridge = ActiveWorkoutRestTimerBridge.shared
 
     var body: some View {
         ZStack {
@@ -82,27 +82,60 @@ private struct AppRootView: View {
                             TodayView(onOpenWorkout: present)
                         }
                     }
-                    .repTabPage(.today, selection: selectedTab, width: geometry.size.width)
+                    .repTabPage(
+                        .today,
+                        selection: selectedTab,
+                        width: geometry.size.width,
+                        dragOffset: pageDragOffset
+                    )
 
                     HistoryView(onOpenWorkout: present)
-                        .repTabPage(.history, selection: selectedTab, width: geometry.size.width)
+                        .repTabPage(
+                            .history,
+                            selection: selectedTab,
+                            width: geometry.size.width,
+                            dragOffset: pageDragOffset
+                        )
 
                     TrainingProgressView()
-                        .repTabPage(.progress, selection: selectedTab, width: geometry.size.width)
+                        .repTabPage(
+                            .progress,
+                            selection: selectedTab,
+                            width: geometry.size.width,
+                            dragOffset: pageDragOffset
+                        )
 
                     RoutinesView(onStartRoutine: start)
-                        .repTabPage(.routines, selection: selectedTab, width: geometry.size.width)
+                        .repTabPage(
+                            .routines,
+                            selection: selectedTab,
+                            width: geometry.size.width,
+                            dragOffset: pageDragOffset
+                        )
 
                     SettingsView()
-                        .repTabPage(.settings, selection: selectedTab, width: geometry.size.width)
+                        .repTabPage(
+                            .settings,
+                            selection: selectedTab,
+                            width: geometry.size.width,
+                            dragOffset: pageDragOffset
+                        )
                 }
-                .simultaneousGesture(mainScreenSwipe())
+                .simultaneousGesture(mainScreenPager(width: geometry.size.width))
                 .safeAreaInset(edge: .bottom, spacing: 0) {
-                    RepTransparentTabBar(
-                        selection: selectedTab,
-                        hasActiveWorkout: presentedWorkout != nil,
-                        onSelect: selectTab
-                    )
+                    VStack(spacing: 0) {
+                        if let restTimer = restTimerBridge.presentedTimer, restTimer.isPresented {
+                            WorkoutRestTimerBanner(restTimer: restTimer)
+                                .transition(.move(edge: .bottom).combined(with: .opacity))
+                        }
+
+                        RepTransparentTabBar(
+                            selection: selectedTab,
+                            hasActiveWorkout: presentedWorkout != nil,
+                            onSelect: selectTab
+                        )
+                    }
+                    .animation(.snappy(duration: 0.25), value: restTimerBridge.presentedTimer?.isPresented ?? false)
                 }
             }
 
@@ -116,6 +149,9 @@ private struct AppRootView: View {
         .environment(\.repThemeSettings, themeSettings)
         .preferredColorScheme(preferredColorScheme)
         .task {
+            async let minimumSplash: Void = {
+                try? await Task.sleep(for: .milliseconds(900))
+            }()
             HapticEngineManager.shared.warm()
             RestTimerLiveActivityManager.reconcileOnLaunch()
             await bootstrapLocalStore()
@@ -123,7 +159,8 @@ private struct AppRootView: View {
             restoreActiveWorkoutIfNeeded()
             warmExercisePickerCache()
             prewarmMainScreenData()
-            withAnimation(.easeOut(duration: 0.22)) {
+            _ = await minimumSplash
+            withAnimation(.easeOut(duration: 0.35)) {
                 isPreparingApp = false
             }
             AppLog.breadcrumb("Tab selected: \(selectedTab.title)")
@@ -170,7 +207,8 @@ private struct AppRootView: View {
     }
 
     private func selectTab(_ tab: AppTab) {
-        withAnimation(.easeOut(duration: Self.pageTransitionDuration)) {
+        withTransaction(Transaction(animation: nil)) {
+            pageDragOffset = 0
             selectedTab = tab
         }
     }
@@ -293,40 +331,74 @@ private struct AppRootView: View {
         _ = try? modelContext.fetch(FetchDescriptor<BodyweightEntry>())
     }
 
-    private func mainScreenSwipe() -> some Gesture {
-        DragGesture(minimumDistance: 24, coordinateSpace: .local)
+    private func mainScreenPager(width: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 10, coordinateSpace: .local)
+            .onChanged { value in
+                guard presentedWorkout == nil else { return }
+                let horizontal = value.translation.width
+                let vertical = value.translation.height
+                guard abs(horizontal) > abs(vertical) * 1.15 else { return }
+
+                let selectedIndex = selectedTab.rawValue
+                let lastIndex = AppTab.allCases.count - 1
+                let isPullingPastFirst = selectedIndex == 0 && horizontal > 0
+                let isPullingPastLast = selectedIndex == lastIndex && horizontal < 0
+                let resistance = isPullingPastFirst || isPullingPastLast ? 0.18 : 1
+
+                var transaction = Transaction(animation: nil)
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    pageDragOffset = horizontal * resistance
+                }
+            }
             .onEnded { value in
+                guard presentedWorkout == nil else {
+                    pageDragOffset = 0
+                    return
+                }
                 let horizontal = value.translation.width
                 let vertical = value.translation.height
                 let projectedHorizontal = value.predictedEndTranslation.width
-                guard (abs(horizontal) > 50 || abs(projectedHorizontal) > 110),
-                      abs(horizontal) > abs(vertical) * 1.4 else { return }
-
                 let tabs = AppTab.allCases
-                guard let index = tabs.firstIndex(of: selectedTab) else { return }
+                guard let index = tabs.firstIndex(of: selectedTab),
+                      abs(horizontal) > abs(vertical) * 1.15 else {
+                    settlePage(on: selectedTab)
+                    return
+                }
+
+                let shouldAdvance = abs(horizontal) > width * 0.24
+                    || abs(projectedHorizontal) > width * 0.48
                 let direction = abs(projectedHorizontal) > abs(horizontal)
                     ? projectedHorizontal
                     : horizontal
-
-                let destination: AppTab?
-                if direction > 0, index > tabs.startIndex {
-                    destination = tabs[index - 1]
-                } else if direction < 0, index < tabs.index(before: tabs.endIndex) {
+                var destination = selectedTab
+                if shouldAdvance, direction < 0,
+                   index < tabs.index(before: tabs.endIndex) {
                     destination = tabs[index + 1]
-                } else {
-                    destination = nil
+                } else if shouldAdvance, direction > 0,
+                          index > tabs.startIndex {
+                    destination = tabs[index - 1]
                 }
-
-                if let destination {
-                    selectTab(destination)
-                }
+                settlePage(on: destination)
             }
+    }
+
+    private func settlePage(on destination: AppTab) {
+        withAnimation(.interactiveSpring(response: 0.22, dampingFraction: 0.9)) {
+            selectedTab = destination
+            pageDragOffset = 0
+        }
     }
 }
 
 private extension View {
-    func repTabPage(_ tab: AppTab, selection: AppTab, width: CGFloat) -> some View {
-        offset(x: CGFloat(tab.rawValue - selection.rawValue) * width)
+    func repTabPage(
+        _ tab: AppTab,
+        selection: AppTab,
+        width: CGFloat,
+        dragOffset: CGFloat
+    ) -> some View {
+        offset(x: CGFloat(tab.rawValue - selection.rawValue) * width + dragOffset)
             .allowsHitTesting(selection == tab)
             .accessibilityHidden(selection != tab)
             .zIndex(selection == tab ? 1 : 0)
@@ -396,15 +468,17 @@ private struct RepTransparentTabBar: View {
 }
 
 private struct RepStartupView: View {
-    @State private var isPulsing = false
+    @State private var isBreathing = false
+    @State private var ringSpin = false
+    @State private var loaderPulse = false
 
     var body: some View {
         ZStack {
             LinearGradient(
                 colors: [
-                    Color(red: 0.01, green: 0.11, blue: 0.48),
-                    Color(red: 0.02, green: 0.38, blue: 0.96),
-                    Color(red: 0.0, green: 0.16, blue: 0.66)
+                    Color(red: 0.02, green: 0.11, blue: 0.36),
+                    Color(red: 0.05, green: 0.38, blue: 0.90),
+                    Color(red: 0.11, green: 0.55, blue: 0.72)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
@@ -412,57 +486,95 @@ private struct RepStartupView: View {
             .ignoresSafeArea()
 
             Circle()
-                .fill(Color.cyan.opacity(0.28))
-                .frame(width: 330, height: 330)
-                .blur(radius: 70)
-                .offset(x: 150, y: -250)
+                .fill(Color(red: 0.25, green: 0.90, blue: 1.0).opacity(0.30))
+                .frame(width: 340, height: 340)
+                .blur(radius: 72)
+                .offset(x: -120, y: -260)
+
+            Circle()
+                .fill(Color(red: 1.0, green: 0.48, blue: 0.20).opacity(0.22))
+                .frame(width: 280, height: 280)
+                .blur(radius: 64)
+                .offset(x: 140, y: 280)
 
             VStack(spacing: 22) {
                 ZStack {
                     Circle()
-                        .fill(.white.opacity(0.14))
-                        .frame(width: 142, height: 142)
-                        .overlay {
-                            Circle().stroke(.white.opacity(0.24), lineWidth: 1)
-                        }
-                        .scaleEffect(isPulsing ? 1.035 : 0.97)
-
-                    Image(systemName: "dumbbell.fill")
-                        .font(.system(size: 72, weight: .bold))
-                        .foregroundStyle(.white)
+                        .stroke(
+                            AngularGradient(
+                                colors: [
+                                    .white.opacity(0.05),
+                                    .white.opacity(0.45),
+                                    Color(red: 0.2, green: 0.85, blue: 0.85).opacity(0.55),
+                                    .white.opacity(0.05)
+                                ],
+                                center: .center
+                            ),
+                            lineWidth: 2
+                        )
+                        .frame(width: 148, height: 148)
+                        .rotationEffect(.degrees(ringSpin ? 360 : 0))
 
                     Circle()
-                        .fill(Color(red: 0.03, green: 0.31, blue: 0.88))
-                        .frame(width: 46, height: 46)
-                        .overlay {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 24, weight: .black))
-                                .foregroundStyle(.white)
-                        }
-                        .shadow(color: .black.opacity(0.18), radius: 9, y: 4)
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    .white.opacity(0.18),
+                                    .white.opacity(0.03),
+                                    .clear
+                                ],
+                                center: .center,
+                                startRadius: 12,
+                                endRadius: 80
+                            )
+                        )
+                        .frame(width: 158, height: 158)
+
+                    RepMascot(pose: .welcome, size: 118)
+                        .scaleEffect(isBreathing ? 1.03 : 0.99)
+                        .shadow(color: .black.opacity(0.22), radius: 12, y: 6)
                 }
 
-                VStack(spacing: 7) {
+                VStack(spacing: 8) {
                     Text("REP")
-                        .font(.system(size: 34, weight: .black, design: .rounded))
+                        .font(.system(size: 36, weight: .black, design: .rounded))
                         .tracking(7)
-                    Text("Ready for your next set")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.white.opacity(0.76))
-                }
-                .foregroundStyle(.white)
+                        .foregroundStyle(.white)
 
-                ProgressView()
-                    .tint(.white)
-                    .controlSize(.regular)
+                    Text("Ready for your next set")
+                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                        .foregroundStyle(.white.opacity(0.78))
+                }
+
+                HStack(spacing: 8) {
+                    ForEach(0..<3, id: \.self) { index in
+                        Circle()
+                            .fill(.white.opacity(0.9))
+                            .frame(width: 7, height: 7)
+                            .scaleEffect(loaderPulse ? 1 : 0.55)
+                            .opacity(loaderPulse ? 1 : 0.35)
+                            .animation(
+                                .easeInOut(duration: 0.55)
+                                    .repeatForever(autoreverses: true)
+                                    .delay(Double(index) * 0.14),
+                                value: loaderPulse
+                            )
+                    }
+                }
+                .padding(.top, 4)
             }
+            .padding(.horizontal, 28)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Rep is getting ready")
         .task {
-            withAnimation(.easeInOut(duration: 1.05).repeatForever(autoreverses: true)) {
-                isPulsing = true
+            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+                isBreathing = true
             }
+            withAnimation(.linear(duration: 4.8).repeatForever(autoreverses: false)) {
+                ringSpin = true
+            }
+            loaderPulse = true
         }
     }
 }

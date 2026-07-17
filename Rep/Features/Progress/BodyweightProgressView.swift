@@ -35,14 +35,14 @@ struct BodyweightProgressView: View {
     var body: some View {
         Group {
             if entries.isEmpty {
-                ContentUnavailableView {
-                    Label("No bodyweight entries", systemImage: "scalemass")
-                } description: {
-                    Text("Log an entry to see how your bodyweight changes over time.")
-                } actions: {
-                    Button("Add bodyweight") { isAddingEntry = true }
-                        .repPrimaryButton()
-                }
+                RepMascotEmptyState(
+                    pose: .empty,
+                    title: "No bodyweight entries",
+                    description: "Log an entry to see how your bodyweight changes over time.",
+                    actionTitle: "Add bodyweight",
+                    actionSystemImage: "plus",
+                    action: { isAddingEntry = true }
+                )
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: RepVisualSystem.pageSpacing) {

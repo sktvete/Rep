@@ -69,6 +69,14 @@ enum RestTimerLiveActivityManager {
         )
     }
 
+    static func togglePauseFromIntent(sessionID: UUID) async {
+        await coordinator.togglePauseFromIntent(sessionKey: sessionID.uuidString)
+    }
+
+    static func adjustFromIntent(sessionID: UUID, by seconds: Int) async {
+        await coordinator.adjustFromIntent(sessionKey: sessionID.uuidString, by: seconds)
+    }
+
     static func clearRest(sessionID: UUID) {
         Task { await coordinator.clearRest(sessionKey: sessionID.uuidString) }
     }
@@ -248,6 +256,104 @@ enum RestTimerLiveActivityManager {
                 nextExerciseName: nextExerciseName
             )
             return endDate
+        }
+
+        func togglePauseFromIntent(sessionKey: String) async {
+            guard let timer = persistedTimer(for: sessionKey) else { return }
+            if timer.isPaused {
+                let endDate = Date().addingTimeInterval(TimeInterval(timer.remainingSeconds))
+                UserDefaults.standard.set(
+                    [
+                        "targetDate": endDate.timeIntervalSince1970,
+                        "nextExerciseName": timer.nextExerciseName
+                    ],
+                    forKey: timerStoragePrefix + sessionKey
+                )
+                await syncTimer(
+                    sessionKey: sessionKey,
+                    endDate: endDate,
+                    remainingSeconds: timer.remainingSeconds,
+                    isPaused: false,
+                    nextExerciseName: timer.nextExerciseName
+                )
+                if let uuid = UUID(uuidString: sessionKey) {
+                    await MainActor.run {
+                        RestTimerNotificationManager.schedule(sessionID: uuid, at: endDate)
+                    }
+                }
+            } else {
+                UserDefaults.standard.set(
+                    [
+                        "pausedRemainingSeconds": timer.remainingSeconds,
+                        "nextExerciseName": timer.nextExerciseName
+                    ],
+                    forKey: timerStoragePrefix + sessionKey
+                )
+                await syncTimer(
+                    sessionKey: sessionKey,
+                    endDate: nil,
+                    remainingSeconds: timer.remainingSeconds,
+                    isPaused: true,
+                    nextExerciseName: timer.nextExerciseName
+                )
+                if let uuid = UUID(uuidString: sessionKey) {
+                    await MainActor.run {
+                        RestTimerNotificationManager.cancel(sessionID: uuid)
+                    }
+                }
+            }
+        }
+
+        func adjustFromIntent(sessionKey: String, by seconds: Int) async {
+            guard let timer = persistedTimer(for: sessionKey) else { return }
+            let adjusted = max(0, timer.remainingSeconds + seconds)
+            guard adjusted > 0 else {
+                await clearRest(sessionKey: sessionKey)
+                if let uuid = UUID(uuidString: sessionKey) {
+                    await MainActor.run {
+                        RestTimerNotificationManager.cancel(sessionID: uuid)
+                    }
+                }
+                return
+            }
+
+            if timer.isPaused {
+                UserDefaults.standard.set(
+                    [
+                        "pausedRemainingSeconds": adjusted,
+                        "nextExerciseName": timer.nextExerciseName
+                    ],
+                    forKey: timerStoragePrefix + sessionKey
+                )
+                await syncTimer(
+                    sessionKey: sessionKey,
+                    endDate: nil,
+                    remainingSeconds: adjusted,
+                    isPaused: true,
+                    nextExerciseName: timer.nextExerciseName
+                )
+            } else {
+                let endDate = Date().addingTimeInterval(TimeInterval(adjusted))
+                UserDefaults.standard.set(
+                    [
+                        "targetDate": endDate.timeIntervalSince1970,
+                        "nextExerciseName": timer.nextExerciseName
+                    ],
+                    forKey: timerStoragePrefix + sessionKey
+                )
+                await syncTimer(
+                    sessionKey: sessionKey,
+                    endDate: endDate,
+                    remainingSeconds: adjusted,
+                    isPaused: false,
+                    nextExerciseName: timer.nextExerciseName
+                )
+                if let uuid = UUID(uuidString: sessionKey) {
+                    await MainActor.run {
+                        RestTimerNotificationManager.schedule(sessionID: uuid, at: endDate)
+                    }
+                }
+            }
         }
 
         func clearRest(sessionKey: String) async {

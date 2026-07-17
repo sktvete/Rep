@@ -111,13 +111,6 @@ struct ActiveWorkoutView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { toolbarContent }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                if restTimer.isPresented {
-                    WorkoutRestTimerBanner(restTimer: restTimer)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-            }
-            .animation(.snappy(duration: 0.25), value: restTimer.isPresented)
         }
         .exerciseThumbnailScope()
         .background(KeyboardDismissTapInstaller())
@@ -131,7 +124,7 @@ struct ActiveWorkoutView: View {
                 in: modelContext
             )
             updateRestTimerHapticsPreference()
-            ActiveWorkoutRestTimerBridge.register {
+            ActiveWorkoutRestTimerBridge.shared.register(timer: restTimer) {
                 restTimer.start(seconds: 5, nextExerciseName: "Development test")
             }
             WorkoutLiveActivityWorkoutCoordinator.register(modelContext: modelContext) { exerciseID in
@@ -140,7 +133,7 @@ struct ActiveWorkoutView: View {
             synchronizeLiveActivity()
         }
         .onDisappear {
-            ActiveWorkoutRestTimerBridge.unregister()
+            ActiveWorkoutRestTimerBridge.shared.unregister(timer: restTimer)
             WorkoutLiveActivityWorkoutCoordinator.unregister()
             debouncedSaveTask?.cancel()
             persist()
@@ -741,6 +734,9 @@ struct ActiveWorkoutView: View {
             set.reopen()
         } else {
             set.markCompleted()
+            if let nextIncomplete = workoutExercise.orderedSets.first(where: { !$0.isCompleted }) {
+                WorkoutLiveActivityStateBuilder.prefillEmptyValues(on: nextIncomplete, from: set)
+            }
             WorkoutLiveActivityWorkoutCoordinator.advanceAfterCompletion(
                 session: session,
                 completedSetID: set.id,

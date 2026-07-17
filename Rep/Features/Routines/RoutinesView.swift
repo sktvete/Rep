@@ -27,24 +27,16 @@ struct RoutinesView: View {
 
                 Group {
                     if visibleRoutines.isEmpty {
-                        ContentUnavailableView {
-                            Label(
-                                showsArchivedRoutines ? "No archived routines" : "No routines yet",
-                                systemImage: "list.bullet.rectangle"
-                            )
-                        } description: {
-                            Text(
-                                showsArchivedRoutines
-                                    ? "Archived routines will appear here."
-                                    : "Save the exercises you train together, then start in one tap."
-                            )
-                        } actions: {
-                            if !showsArchivedRoutines {
-                                Button("Create Routine", systemImage: "plus") { isCreatingRoutine = true }
-                                    .repPrimaryButton()
-                                    .controlSize(.large)
-                            }
-                        }
+                        RepMascotEmptyState(
+                            pose: .empty,
+                            title: showsArchivedRoutines ? "No archived routines" : "No routines yet",
+                            description: showsArchivedRoutines
+                                ? "Archived routines will appear here."
+                                : "Save the exercises you train together, then start in one tap.",
+                            actionTitle: showsArchivedRoutines ? nil : "Create Routine",
+                            actionSystemImage: "plus",
+                            action: showsArchivedRoutines ? nil : { isCreatingRoutine = true }
+                        )
                     } else {
                         List {
                             Section {

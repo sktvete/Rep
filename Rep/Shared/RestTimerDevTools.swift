@@ -13,7 +13,7 @@ enum RestTimerDevTools {
     static func startFiveSecondTimer(hapticsEnabled: Bool) {
         completionTask?.cancel()
 
-        let startedInWorkout = ActiveWorkoutRestTimerBridge.startIfRegistered()
+        let startedInWorkout = ActiveWorkoutRestTimerBridge.shared.startIfRegistered()
 
         if !startedInWorkout {
             RestTimerLiveActivityManager.sync(
@@ -42,18 +42,29 @@ enum RestTimerDevTools {
 #endif
 
 @MainActor
-enum ActiveWorkoutRestTimerBridge {
-    private static var startHandler: (() -> Void)?
+@Observable
+final class ActiveWorkoutRestTimerBridge {
+    static let shared = ActiveWorkoutRestTimerBridge()
 
-    static func register(startHandler: @escaping () -> Void) {
+    private(set) var presentedTimer: WorkoutRestTimerViewModel?
+    private var startHandler: (() -> Void)?
+
+    func register(
+        timer: WorkoutRestTimerViewModel,
+        startHandler: @escaping () -> Void
+    ) {
+        presentedTimer = timer
         self.startHandler = startHandler
     }
 
-    static func unregister() {
+    func unregister(timer: WorkoutRestTimerViewModel) {
+        if presentedTimer === timer {
+            presentedTimer = nil
+        }
         startHandler = nil
     }
 
-    static func startIfRegistered() -> Bool {
+    func startIfRegistered() -> Bool {
         guard let startHandler else { return false }
         startHandler()
         return true

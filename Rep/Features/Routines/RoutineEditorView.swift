@@ -26,28 +26,40 @@ struct RoutineEditorView: View {
     var body: some View {
         List {
             Section {
-                VStack(alignment: .leading, spacing: 0) {
-                    LabeledContent {
+                VStack(alignment: .leading, spacing: 20) {
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .fill(routine.colorPreset.color.gradient)
+                        .frame(height: 6)
+                        .frame(maxWidth: .infinity)
+                        .accessibilityHidden(true)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Name")
+                            .font(.caption.weight(.semibold))
+                            .repSecondaryText()
                         TextField("Routine name", text: $routine.name)
-                            .multilineTextAlignment(.trailing)
-                            .font(.body.weight(.medium))
+                            .font(.title3.weight(.semibold))
+                            .textInputAutocapitalization(.words)
                             .submitLabel(.done)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             .onSubmit(keepChanges)
                             .onChange(of: routine.name) { _, _ in scheduleKeepChanges() }
-                    } label: {
-                        Label("Name", systemImage: "textformat")
                     }
 
-                    Divider().padding(.vertical, 12)
-
-                    TextField("Notes (optional)", text: $routine.notes, axis: .vertical)
-                        .lineLimit(2...5)
-                        .onChange(of: routine.notes) { _, _ in scheduleKeepChanges() }
-
-                    Divider().padding(.vertical, 12)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Notes")
+                            .font(.caption.weight(.semibold))
+                            .repSecondaryText()
+                        TextField("Optional context for this routine", text: $routine.notes, axis: .vertical)
+                            .lineLimit(2...5)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .onChange(of: routine.notes) { _, _ in scheduleKeepChanges() }
+                    }
 
                     VStack(alignment: .leading, spacing: 10) {
-                        Label("Color", systemImage: "paintpalette")
+                        Text("Color")
+                            .font(.caption.weight(.semibold))
+                            .repSecondaryText()
                         RoutineColorPicker(selection: Binding(
                             get: { routine.colorPreset },
                             set: { preset in
@@ -129,7 +141,7 @@ struct RoutineEditorView: View {
             debouncedSaveTask?.cancel()
             keepChanges()
         }
-        .safeAreaInset(edge: .bottom) {
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             if !routine.isArchived {
                 Button(action: onStartRoutine) {
                     Text("Start \(routine.name.isEmpty ? "Workout" : routine.name)")
@@ -141,7 +153,7 @@ struct RoutineEditorView: View {
                 .controlSize(.large)
                 .padding(.horizontal)
                 .padding(.vertical, 10)
-                .background(.bar)
+                .padding(.bottom, RepVisualSystem.mainTabBarReservedHeight)
                 .disabled(orderedExercises.isEmpty)
             }
         }

@@ -52,6 +52,68 @@ struct WorkoutLiveActivityStateBuilderTests {
         )
     }
 
+    @Test("Another-set navigation stays on the same exercise")
+    @MainActor
+    func anotherSetStaysOnExercise() {
+        let first = WorkoutSet(orderIndex: 0, weight: 100, repetitions: 5, isCompleted: true)
+        let second = WorkoutSet(orderIndex: 1)
+        let row = workoutExercise(name: "Row", orderIndex: 0, sets: [first, second])
+        let curl = workoutExercise(
+            name: "Curl",
+            orderIndex: 1,
+            sets: [WorkoutSet(orderIndex: 0)]
+        )
+        let session = WorkoutSession(name: "Pull", exercises: [row, curl])
+        let target = WorkoutLiveActivityStateBuilder.Target(exercise: row, set: first)
+
+        let same = WorkoutLiveActivityStateBuilder.nextTargetOnSameExercise(after: target)
+        #expect(same?.set.id == second.id)
+        #expect(same?.exercise.id == row.id)
+
+        let across = WorkoutLiveActivityStateBuilder.nextTarget(after: target, in: session)
+        #expect(across?.set.id == second.id)
+
+        let last = WorkoutLiveActivityStateBuilder.Target(exercise: row, set: second)
+        second.markCompleted()
+        #expect(WorkoutLiveActivityStateBuilder.nextTargetOnSameExercise(after: last) == nil)
+        #expect(
+            WorkoutLiveActivityStateBuilder.nextTarget(after: last, in: session)?.exercise.id
+                == curl.id
+        )
+    }
+
+    @Test("Empty next-set fields inherit the completed set values")
+    @MainActor
+    func prefillEmptyValuesFromCompletedSet() {
+        let completed = WorkoutSet(
+            orderIndex: 0,
+            weight: 80,
+            repetitions: 8,
+            isCompleted: true
+        )
+        let empty = WorkoutSet(orderIndex: 1)
+        WorkoutLiveActivityStateBuilder.prefillEmptyValues(on: empty, from: completed)
+
+        #expect(empty.weight == 80)
+        #expect(empty.repetitions == 8)
+    }
+
+    @Test("Existing next-set values are preserved when prefilling")
+    @MainActor
+    func prefillKeepsExistingValues() {
+        let completed = WorkoutSet(
+            orderIndex: 0,
+            weight: 80,
+            repetitions: 8,
+            isCompleted: true
+        )
+        let planned = WorkoutSet(orderIndex: 1, weight: 85, repetitions: 6)
+        WorkoutLiveActivityStateBuilder.prefillEmptyValues(on: planned, from: completed)
+
+        #expect(planned.weight == 85)
+        #expect(planned.repetitions == 6)
+    }
+
     @Test("Shoulder weight controls use smaller increments")
     @MainActor
     func shoulderIncrement() {

@@ -22,7 +22,16 @@ struct RestTimerLiveActivityWidget: Widget {
                     }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    IslandTimerText(context: context, size: 15, weight: .semibold)
+                    HStack(spacing: 8) {
+                        IslandTimerText(context: context, size: 15, weight: .semibold)
+                        if context.state.isResting {
+                            RestTimerQuickControls(
+                                sessionID: context.attributes.sessionID,
+                                isPaused: context.state.isPaused,
+                                compact: true
+                            )
+                        }
+                    }
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     if let set = context.state.currentSet {
@@ -60,7 +69,7 @@ private struct RestTimerLockScreenView: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            HStack(alignment: .center, spacing: 12) {
+            HStack(alignment: .center, spacing: 10) {
                 VStack(alignment: .leading, spacing: 2) {
                     if let set = context.state.currentSet {
                         Text(set.exerciseName)
@@ -82,6 +91,14 @@ private struct RestTimerLockScreenView: View {
                 Spacer(minLength: 8)
 
                 IslandTimerText(context: context, size: 21, weight: .bold, forLockScreen: true)
+
+                if context.state.isResting {
+                    RestTimerQuickControls(
+                        sessionID: context.attributes.sessionID,
+                        isPaused: context.state.isPaused,
+                        compact: false
+                    )
+                }
             }
 
             if let set = context.state.currentSet {
@@ -97,64 +114,113 @@ private struct RestTimerLockScreenView: View {
     }
 }
 
+private struct RestTimerQuickControls: View {
+    let sessionID: String
+    let isPaused: Bool
+    let compact: Bool
+
+    var body: some View {
+        HStack(spacing: compact ? 4 : 6) {
+            Button(
+                intent: AdjustRestTimerIntent(sessionID: sessionID, seconds: 15)
+            ) {
+                Text("+15")
+                    .font(.caption.weight(.bold).monospacedDigit())
+                    .frame(minWidth: compact ? 34 : 40, minHeight: compact ? 28 : 32)
+            }
+            .buttonStyle(.bordered)
+            .accessibilityLabel("Add 15 seconds")
+
+            Button(
+                intent: ToggleRestTimerPauseIntent(sessionID: sessionID)
+            ) {
+                Image(systemName: isPaused ? "play.fill" : "pause.fill")
+                    .font(.caption.weight(.semibold))
+                    .frame(width: compact ? 28 : 32, height: compact ? 28 : 32)
+            }
+            .buttonStyle(.bordered)
+            .accessibilityLabel(isPaused ? "Resume rest" : "Pause rest")
+        }
+    }
+}
+
 private struct WorkoutSetControls: View {
     let sessionID: String
     let set: WorkoutLiveActivitySet
     let compact: Bool
 
     var body: some View {
-        HStack(spacing: compact ? 6 : 8) {
-            if set.supportsWeight {
-                metricControl(
-                    title: set.weightUnitSymbol,
-                    value: weightText,
-                    decrementIntent: AdjustWorkoutWeightIntent(
-                        sessionID: sessionID,
-                        setID: set.setID,
-                        delta: -set.weightStep
-                    ),
-                    incrementIntent: AdjustWorkoutWeightIntent(
-                        sessionID: sessionID,
-                        setID: set.setID,
-                        delta: set.weightStep
-                    ),
-                    decrementLabel: "Decrease weight",
-                    incrementLabel: "Increase weight"
-                )
+        VStack(spacing: compact ? 6 : 8) {
+            HStack(spacing: compact ? 6 : 8) {
+                if set.supportsWeight {
+                    metricControl(
+                        title: set.weightUnitSymbol,
+                        value: weightText,
+                        decrementIntent: AdjustWorkoutWeightIntent(
+                            sessionID: sessionID,
+                            setID: set.setID,
+                            delta: -set.weightStep
+                        ),
+                        incrementIntent: AdjustWorkoutWeightIntent(
+                            sessionID: sessionID,
+                            setID: set.setID,
+                            delta: set.weightStep
+                        ),
+                        decrementLabel: "Decrease weight",
+                        incrementLabel: "Increase weight"
+                    )
+                }
+
+                if set.supportsRepetitions {
+                    metricControl(
+                        title: "reps",
+                        value: set.repetitions.map(String.init) ?? "—",
+                        decrementIntent: AdjustWorkoutRepetitionsIntent(
+                            sessionID: sessionID,
+                            setID: set.setID,
+                            delta: -1
+                        ),
+                        incrementIntent: AdjustWorkoutRepetitionsIntent(
+                            sessionID: sessionID,
+                            setID: set.setID,
+                            delta: 1
+                        ),
+                        decrementLabel: "Remove one repetition",
+                        incrementLabel: "Add one repetition"
+                    )
+                }
+
+                Spacer(minLength: 0)
             }
 
-            if set.supportsRepetitions {
-                metricControl(
-                    title: "reps",
-                    value: set.repetitions.map(String.init) ?? "—",
-                    decrementIntent: AdjustWorkoutRepetitionsIntent(
+            HStack(spacing: compact ? 6 : 8) {
+                Button(
+                    intent: CompleteAnotherWorkoutSetIntent(
                         sessionID: sessionID,
-                        setID: set.setID,
-                        delta: -1
-                    ),
-                    incrementIntent: AdjustWorkoutRepetitionsIntent(
-                        sessionID: sessionID,
-                        setID: set.setID,
-                        delta: 1
-                    ),
-                    decrementLabel: "Remove one repetition",
-                    incrementLabel: "Add one repetition"
-                )
-            }
+                        setID: set.setID
+                    )
+                ) {
+                    Label("Another", systemImage: "plus")
+                        .font(.caption.weight(.bold))
+                        .frame(maxWidth: .infinity, minHeight: compact ? 30 : 32)
+                }
+                .buttonStyle(.bordered)
+                .accessibilityLabel("Complete set and do another \(set.exerciseName)")
 
-            Button(
-                intent: CompleteWorkoutSetIntent(
-                    sessionID: sessionID,
-                    setID: set.setID
-                )
-            ) {
-                Label("Done", systemImage: "checkmark")
-                    .font(.caption.weight(.bold))
-                    .frame(minWidth: compact ? 54 : 62, minHeight: 32)
+                Button(
+                    intent: CompleteWorkoutSetIntent(
+                        sessionID: sessionID,
+                        setID: set.setID
+                    )
+                ) {
+                    Label("Next", systemImage: "checkmark")
+                        .font(.caption.weight(.bold))
+                        .frame(maxWidth: .infinity, minHeight: compact ? 30 : 32)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.green)
+                .accessibilityLabel("Complete set and move to the next set")
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.green)
-            .accessibilityLabel("Complete \(set.exerciseName), set \(set.setNumber)")
         }
     }
 

@@ -47,11 +47,11 @@ struct HistoryView: View {
                 RepScreenBackground()
 
                 if completedSessions.isEmpty && ongoingSessions.isEmpty {
-                    ContentUnavailableView {
-                        Label("No workouts yet", systemImage: "clock.arrow.circlepath")
-                    } description: {
-                        Text("Finished workouts will appear here with every exercise and set.")
-                    }
+                    RepMascotEmptyState(
+                        pose: .empty,
+                        title: "No workouts yet",
+                        description: "Finished workouts will appear here with every exercise and set."
+                    )
                 } else {
                     List {
                         if !ongoingSessions.isEmpty {

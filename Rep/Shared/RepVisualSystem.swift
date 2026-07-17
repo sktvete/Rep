@@ -5,6 +5,7 @@ enum RepVisualSystem {
     static let cardRadius: CGFloat = 22
     static let controlRadius: CGFloat = 16
     static let pageSpacing: CGFloat = 20
+    static let mainTabBarReservedHeight: CGFloat = 74
 }
 
 private struct RepMainNavigationTitleModifier: ViewModifier {

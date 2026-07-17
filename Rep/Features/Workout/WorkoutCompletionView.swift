@@ -19,67 +19,147 @@ struct WorkoutCompletionView: View {
         orderedExercises.reduce(0) { $0 + $1.totalVolume }
     }
 
+    private var volumeComparisons: [VolumeComparison] {
+        VolumeComparisonCatalog.comparisons(forKilograms: applicableVolume, limit: 18)
+    }
+
     var body: some View {
         ZStack {
             RepScreenBackground()
                 .ignoresSafeArea()
 
-            ConfettiView()
-                .frame(maxWidth: .infinity, maxHeight: 280, alignment: .top)
-                .frame(maxHeight: .infinity, alignment: .top)
+            VStack(spacing: 0) {
+                ScrollView {
+                    VStack(spacing: 22) {
+                        VStack(spacing: 10) {
+                            RepMascot(pose: .celebrate, size: 150)
+                                .scaleEffect(didCelebrate ? 1.06 : 0.82)
+                                .animation(
+                                    .spring(response: 0.5, dampingFraction: 0.68),
+                                    value: didCelebrate
+                                )
 
-            VStack(spacing: 28) {
-                Spacer()
+                            Text("Workout complete")
+                                .font(.largeTitle.bold())
 
-                VStack(spacing: 10) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 56))
-                        .foregroundStyle(.green)
-                        .symbolEffect(.bounce, value: true)
+                            Text(session.name)
+                                .font(.title3.weight(.medium))
+                                .repSecondaryText()
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding(.top, 8)
 
-                    Text("Workout complete")
-                        .font(.largeTitle.bold())
+                        LazyVGrid(
+                            columns: [GridItem(.adaptive(minimum: 92), spacing: 10)],
+                            spacing: 10
+                        ) {
+                            CompletionMetric(
+                                title: "Duration",
+                                value: session.historyDuration.formattedWorkoutDuration,
+                                systemImage: "timer"
+                            )
+                            CompletionMetric(
+                                title: "Exercises",
+                                value: orderedExercises.count.formatted(),
+                                systemImage: "dumbbell"
+                            )
+                            CompletionMetric(
+                                title: "Sets",
+                                value: completedSetCount.formatted(),
+                                systemImage: "checkmark.circle"
+                            )
+                        }
 
-                    Text(session.name)
-                        .font(.title3.weight(.medium))
-                        .repSecondaryText()
-                        .multilineTextAlignment(.center)
+                        if applicableVolume > 0 {
+                            VolumeComparisonsCard(
+                                volumeKilograms: applicableVolume,
+                                preferredUnit: preferredUnit,
+                                comparisons: volumeComparisons
+                            )
+                        }
+                    }
+                    .padding(RepVisualSystem.pageSpacing)
+                    .padding(.bottom, 12)
                 }
-
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 10)], spacing: 10) {
-                    CompletionMetric(
-                        title: "Duration",
-                        value: session.historyDuration.formattedWorkoutDuration,
-                        systemImage: "timer"
-                    )
-                    CompletionMetric(
-                        title: "Exercises",
-                        value: orderedExercises.count.formatted(),
-                        systemImage: "dumbbell"
-                    )
-                    CompletionMetric(
-                        title: "Sets",
-                        value: completedSetCount.formatted(),
-                        systemImage: "checkmark.circle"
-                    )
-                }
-
-                if applicableVolume > 0 {
-                    let displayedVolume = UnitConversion.weight(applicableVolume, from: .kilograms, to: preferredUnit)
-                    Text("\(displayedVolume.formatted(.number.precision(.fractionLength(0)))) \(preferredUnit.symbol) volume")
-                        .font(.subheadline.weight(.semibold).monospacedDigit())
-                        .repSecondaryText()
-                }
-
-                Spacer()
+                .scrollIndicators(.hidden)
 
                 Button("Done", action: onDone)
                     .repPrimaryButton()
+                    .padding(.horizontal, RepVisualSystem.pageSpacing)
+                    .padding(.bottom, 12)
             }
-            .padding(RepVisualSystem.pageSpacing)
+
+            ConfettiView()
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
         }
         .sensoryFeedback(.success, trigger: didCelebrate)
         .onAppear { didCelebrate = true }
+    }
+}
+
+private struct VolumeComparisonsCard: View {
+    let volumeKilograms: Double
+    let preferredUnit: WeightUnit
+    let comparisons: [VolumeComparison]
+
+    private var displayedVolume: Double {
+        UnitConversion.weight(volumeKilograms, from: .kilograms, to: preferredUnit)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 4) {
+                Label("You moved", systemImage: "scalemass.fill")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(RepVisualSystem.tint)
+                    .textCase(.uppercase)
+                    .tracking(0.5)
+
+                Text(
+                    "\(displayedVolume.formatted(.number.precision(.fractionLength(0...1)))) \(preferredUnit.symbol)"
+                )
+                .font(.title.bold().monospacedDigit())
+                .fontDesign(.rounded)
+
+                Text("Exact volume from this session — here’s what that weighs like:")
+                    .font(.footnote)
+                    .repSecondaryText()
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            VStack(spacing: 0) {
+                ForEach(Array(comparisons.enumerated()), id: \.element.id) { index, comparison in
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        Text(comparison.label)
+                            .font(.headline.monospacedDigit())
+                            .fontDesign(.rounded)
+                            .frame(minWidth: 56, alignment: .trailing)
+
+                        Text(comparison.detail)
+                            .font(.subheadline.weight(.medium))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        if comparison.isSurprising {
+                            Text("wild")
+                                .font(.caption2.weight(.bold))
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(Color.orange.opacity(0.18), in: Capsule())
+                                .foregroundStyle(.orange)
+                        }
+                    }
+                    .padding(.vertical, 8)
+
+                    if index < comparisons.count - 1 {
+                        Divider().opacity(0.28)
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .repSurface(cornerRadius: RepVisualSystem.controlRadius)
+        .accessibilityElement(children: .combine)
     }
 }
 

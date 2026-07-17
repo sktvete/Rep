@@ -35,7 +35,7 @@ struct WorkoutLiveActivityStateBuilderTests {
         #expect(WorkoutLiveActivityStateBuilder.targetLabel(next!) == "Curl · Set 1")
     }
 
-    @Test("The final exercise points to another set instead of the first exercise")
+    @Test("The final exercise does not wrap or invent another set")
     @MainActor
     func finalExerciseDoesNotLoop() {
         let firstSet = WorkoutSet(orderIndex: 0, isCompleted: true)
@@ -48,7 +48,7 @@ struct WorkoutLiveActivityStateBuilderTests {
         #expect(WorkoutLiveActivityStateBuilder.nextTarget(after: target, in: session) == nil)
         #expect(
             WorkoutLiveActivityStateBuilder.followingLabel(after: target, in: session)
-                == "Raise · Another set"
+                == "All sets done"
         )
     }
 
@@ -121,6 +121,7 @@ struct WorkoutLiveActivityStateBuilderTests {
         let item = workoutExercise(
             name: "Lateral Raise",
             muscle: .shoulders,
+            equipment: .dumbbell,
             orderIndex: 0,
             sets: [set]
         )
@@ -136,10 +137,38 @@ struct WorkoutLiveActivityStateBuilderTests {
         )
     }
 
+    @Test("Weight steps follow equipment and muscle conventions")
+    @MainActor
+    func weightStepsByEquipment() {
+        #expect(ExerciseWeightStep.kilogramsStep(for: exercise(muscle: .back, equipment: .machine)) == 5)
+        #expect(ExerciseWeightStep.kilogramsStep(for: exercise(muscle: .back, equipment: .cable)) == 2.5)
+        #expect(ExerciseWeightStep.kilogramsStep(for: exercise(muscle: .chest, equipment: .dumbbell)) == 2.5)
+        #expect(ExerciseWeightStep.kilogramsStep(for: exercise(muscle: .chest, equipment: .barbell)) == 5)
+        #expect(ExerciseWeightStep.kilogramsStep(for: exercise(muscle: .back, equipment: .barbell)) == 5)
+        #expect(ExerciseWeightStep.kilogramsStep(for: exercise(muscle: .biceps, equipment: .barbell)) == 5)
+        #expect(ExerciseWeightStep.kilogramsStep(for: exercise(muscle: .biceps, equipment: .machine)) == 1)
+        #expect(ExerciseWeightStep.step(for: exercise(muscle: .back, equipment: .machine), preferredUnit: .pounds) == 10)
+        #expect(ExerciseWeightStep.step(for: exercise(muscle: .chest, equipment: .barbell), preferredUnit: .pounds) == 10)
+        #expect(ExerciseWeightStep.step(for: exercise(muscle: .chest, equipment: .dumbbell), preferredUnit: .pounds) == 5)
+    }
+
+    @MainActor
+    private func exercise(
+        muscle: MuscleGroup,
+        equipment: Equipment
+    ) -> Exercise {
+        Exercise(
+            name: "Test",
+            primaryMuscleGroup: muscle,
+            equipment: equipment
+        )
+    }
+
     @MainActor
     private func workoutExercise(
         name: String,
         muscle: MuscleGroup = .back,
+        equipment: Equipment = .dumbbell,
         orderIndex: Int,
         sets: [WorkoutSet]
     ) -> WorkoutExercise {
@@ -147,7 +176,7 @@ struct WorkoutLiveActivityStateBuilderTests {
             exercise: Exercise(
                 name: name,
                 primaryMuscleGroup: muscle,
-                equipment: .dumbbell
+                equipment: equipment
             ),
             orderIndex: orderIndex,
             sets: sets

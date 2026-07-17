@@ -11,22 +11,32 @@ enum RestTimerDevTools {
     private static var completionTask: Task<Void, Never>?
 
     static func startFiveSecondTimer(hapticsEnabled: Bool) {
+        startTimer(seconds: 5, hapticsEnabled: hapticsEnabled)
+    }
+
+    /// Longer standalone timer for lock-screen / Live Activity screenshots.
+    static func startScreenshotTimer(hapticsEnabled: Bool) {
+        startTimer(seconds: 180, hapticsEnabled: hapticsEnabled)
+    }
+
+    private static func startTimer(seconds: Int, hapticsEnabled: Bool) {
         completionTask?.cancel()
 
         let startedInWorkout = ActiveWorkoutRestTimerBridge.shared.startIfRegistered()
+        let duration = TimeInterval(seconds)
 
         if !startedInWorkout {
             RestTimerLiveActivityManager.sync(
                 sessionID: standaloneSessionID,
-                endDate: Date().addingTimeInterval(5),
-                remainingSeconds: 5,
+                endDate: Date().addingTimeInterval(duration),
+                remainingSeconds: seconds,
                 isPaused: false,
                 nextExerciseName: "Development test"
             )
         }
 
         completionTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(5))
+            try? await Task.sleep(for: .seconds(duration))
             guard !Task.isCancelled else { return }
 
             if !startedInWorkout {

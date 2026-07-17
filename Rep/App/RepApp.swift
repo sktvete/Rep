@@ -165,6 +165,9 @@ private struct AppRootView: View {
             withAnimation(.easeOut(duration: 0.35)) {
                 isPreparingApp = false
             }
+#if DEBUG
+            startDevelopmentRestTimerIfRequested()
+#endif
             AppLog.breadcrumb("Tab selected: \(selectedTab.title)")
         }
         .onChange(of: selectedTab) { _, tab in
@@ -279,6 +282,18 @@ private struct AppRootView: View {
         }
 #endif
     }
+
+#if DEBUG
+    private func startDevelopmentRestTimerIfRequested() {
+        guard ProcessInfo.processInfo.arguments.contains("-RepStartRestTimer") else { return }
+        Task { @MainActor in
+            // Wait for ActivityKit + scene to be ready after cold launch.
+            try? await Task.sleep(for: .milliseconds(800))
+            let haptics = (try? modelContext.fetch(FetchDescriptor<UserSettings>()).first?.hapticsEnabled) ?? true
+            RestTimerDevTools.startScreenshotTimer(hapticsEnabled: haptics)
+        }
+    }
+#endif
 
     private func bootstrapLocalStore() async {
         var catalogPreparationError: Error?

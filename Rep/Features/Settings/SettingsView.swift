@@ -234,44 +234,33 @@ private struct SettingsForm: View {
 
 #if DEBUG
             Section {
-                VStack(spacing: 0) {
-                    if settings.hasGeneratedSampleData {
-                        Button("Remove Sample Data", systemImage: "trash", role: .destructive) {
-                            onClearSampleData()
-                        }
-                    } else {
-                        Button("Generate Sample Data", systemImage: "sparkles") {
-                            onGenerateSampleData()
-                        }
+                if settings.hasGeneratedSampleData {
+                    Button("Remove Sample Data", systemImage: "trash", role: .destructive) {
+                        onClearSampleData()
                     }
-
-                    Divider().padding(.vertical, 12)
-
-                    Button("Test Rest Timer Haptics", systemImage: "waveform.path") {
-                        Task { @MainActor in
-                            await HapticFeedback.tripleBuzzAndWait()
-                        }
-                    }
-
-                    Divider().padding(.vertical, 12)
-
-                    Button("Start 5 Second Rest Timer", systemImage: "timer") {
-                        RestTimerDevTools.startFiveSecondTimer(hapticsEnabled: settings.hapticsEnabled)
-                    }
-
-                    Divider().padding(.vertical, 12)
-
-                    Button("Clear Caches", systemImage: "externaldrive.badge.xmark") {
-                        DevCacheTools.clearCaches(in: modelContext)
-                    }
-
-                    Divider().padding(.vertical, 12)
-
-                    Button("Crash Diagnostics", systemImage: "doc.text.magnifyingglass") {
-                        isShowingDiagnostics = true
+                } else {
+                    Button("Generate Sample Data", systemImage: "sparkles") {
+                        onGenerateSampleData()
                     }
                 }
-                .repThemedListSection()
+
+                Button("Test Rest Timer Haptics", systemImage: "waveform.path") {
+                    Task { @MainActor in
+                        await HapticFeedback.tripleBuzzAndWait()
+                    }
+                }
+
+                Button("Start 5 Second Rest Timer", systemImage: "timer") {
+                    RestTimerDevTools.startFiveSecondTimer(hapticsEnabled: settings.hapticsEnabled)
+                }
+
+                Button("Clear Caches", systemImage: "externaldrive.badge.xmark") {
+                    DevCacheTools.clearCaches(in: modelContext)
+                }
+
+                Button("Crash Diagnostics", systemImage: "doc.text.magnifyingglass") {
+                    isShowingDiagnostics = true
+                }
             } header: {
                 RepSectionHeader(title: "Development")
             } footer: {

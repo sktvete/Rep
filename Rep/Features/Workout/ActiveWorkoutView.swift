@@ -628,8 +628,7 @@ struct ActiveWorkoutView: View {
     }
 
     private func weightStep(for exercise: Exercise?) -> Double {
-        guard exercise?.primaryMuscleGroup == .shoulders else { return 5 }
-        return preferredUnit == .kilograms ? 1 : 2.5
+        ExerciseWeightStep.step(for: exercise, preferredUnit: preferredUnit)
     }
 
     private var emptyWorkout: some View {
@@ -769,8 +768,7 @@ struct ActiveWorkoutView: View {
             return nextExercise.exercise?.name ?? "Next exercise"
         }
 
-        let exerciseName = workoutExercise.exercise?.name ?? "Exercise"
-        return "\(exerciseName) · Another set"
+        return "All sets done"
     }
 
     private func previousWorkoutExercise(for workoutExercise: WorkoutExercise) -> (exercise: WorkoutExercise, date: Date)? {

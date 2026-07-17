@@ -127,7 +127,11 @@ struct HistoryView: View {
                     }
                     .listStyle(.plain)
                     .scrollContentBackground(.hidden)
-                    .contentMargins(.bottom, RepVisualSystem.pageSpacing, for: .scrollContent)
+                    .contentMargins(
+                        .bottom,
+                        RepVisualSystem.mainTabBarReservedHeight,
+                        for: .scrollContent
+                    )
                     .repSoftScrollEdges()
                 }
             }

@@ -102,7 +102,7 @@ struct ExerciseProgressView: View {
                         }
                     }
                     .padding(.horizontal, RepVisualSystem.pageSpacing)
-                    .padding(.bottom, RepVisualSystem.pageSpacing)
+                    .padding(.bottom, RepVisualSystem.mainTabBarReservedHeight)
                 }
                 .scrollIndicators(.hidden)
                 .repSoftScrollEdges()

@@ -26,13 +26,7 @@ struct RoutineEditorView: View {
     var body: some View {
         List {
             Section {
-                VStack(alignment: .leading, spacing: 20) {
-                    RoundedRectangle(cornerRadius: 3, style: .continuous)
-                        .fill(routine.colorPreset.color.gradient)
-                        .frame(height: 6)
-                        .frame(maxWidth: .infinity)
-                        .accessibilityHidden(true)
-
+                VStack(alignment: .leading, spacing: 16) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Name")
                             .font(.caption.weight(.semibold))
@@ -50,13 +44,13 @@ struct RoutineEditorView: View {
                         Text("Notes")
                             .font(.caption.weight(.semibold))
                             .repSecondaryText()
-                        TextField("Optional context for this routine", text: $routine.notes, axis: .vertical)
-                            .lineLimit(2...5)
+                        TextField("Optional", text: $routine.notes, axis: .vertical)
+                            .lineLimit(1...3)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .onChange(of: routine.notes) { _, _ in scheduleKeepChanges() }
                     }
 
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 8) {
                         Text("Color")
                             .font(.caption.weight(.semibold))
                             .repSecondaryText()
@@ -69,40 +63,32 @@ struct RoutineEditorView: View {
                         ))
                     }
                 }
-                .repThemedListSection()
+                .repThemedListSection(padding: 16)
             } header: {
                 RepSectionHeader(title: "Routine")
             }
 
             Section {
-                if orderedExercises.isEmpty {
-                    ContentUnavailableView(
-                        "No exercises",
-                        systemImage: "dumbbell",
-                        description: Text("Add an exercise to shape this routine.")
-                    )
-                    .frame(maxWidth: .infinity)
-                    .repThemedListSection(padding: 24)
-                } else {
-                    ForEach(Array(orderedExercises.enumerated()), id: \.element.id) { index, item in
-                        Button {
-                            itemBeingConfigured = item
-                        } label: {
-                            RoutineExerciseRow(item: item, listIndex: index)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityHint("Opens set, repetition, and rest settings")
-                        .repThemedListRow()
+                ForEach(Array(orderedExercises.enumerated()), id: \.element.id) { index, item in
+                    Button {
+                        itemBeingConfigured = item
+                    } label: {
+                        RoutineExerciseRow(item: item, listIndex: index)
                     }
-                    .onDelete(perform: removeExercises)
-                    .onMove(perform: moveExercises)
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Opens set, repetition, and rest settings")
+                    .repThemedListRow()
                 }
+                .onDelete(perform: removeExercises)
+                .onMove(perform: moveExercises)
 
                 Button {
                     isChoosingExercise = true
                 } label: {
                     Label("Add Exercise", systemImage: "plus.circle.fill")
+                        .fontWeight(.semibold)
                 }
+                .foregroundStyle(routine.colorPreset.color)
                 .repThemedListRow()
             } header: {
                 HStack {
@@ -115,9 +101,11 @@ struct RoutineEditorView: View {
                     }
                 }
             } footer: {
-                if !orderedExercises.isEmpty {
-                    Text("Drag while editing to match the order you normally train. You can still change it during a workout.")
-                }
+                Text(
+                    orderedExercises.isEmpty
+                        ? "Add the movements for this routine. You can tune sets and rest on each exercise."
+                        : "Drag while editing to match the order you normally train."
+                )
             }
 
             Section {
@@ -128,6 +116,8 @@ struct RoutineEditorView: View {
             }
         }
         .repThemedList()
+        // Start bar + tab-bar spacer already reserve the bottom via safeAreaInset.
+        .contentMargins(.bottom, 8, for: .scrollContent)
         .background(RepScreenBackground())
         .exerciseThumbnailScope {
             ExerciseThumbnailPrefetch.sources(
@@ -137,24 +127,32 @@ struct RoutineEditorView: View {
         }
         .navigationTitle(routine.name.isEmpty ? "Routine" : routine.name)
         .navigationBarTitleDisplayMode(.inline)
+        .tint(routine.colorPreset.color)
         .onDisappear {
             debouncedSaveTask?.cancel()
             keepChanges()
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if !routine.isArchived {
-                Button(action: onStartRoutine) {
-                    Text("Start \(routine.name.isEmpty ? "Workout" : routine.name)")
-                        .frame(maxWidth: .infinity)
-                        .font(.headline)
+                VStack(spacing: 0) {
+                    Button(action: onStartRoutine) {
+                        Text("Start \(routine.name.isEmpty ? "Workout" : routine.name)")
+                            .frame(maxWidth: .infinity)
+                            .font(.headline)
+                    }
+                    .repPrimaryButton()
+                    .tint(routine.colorPreset.color)
+                    .controlSize(.large)
+                    .disabled(orderedExercises.isEmpty)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+                    .padding(.bottom, 10)
+                    .frame(maxWidth: .infinity)
+                    .background(.bar)
+
+                    // Lift above the floating root tab bar (overlay, not a system inset).
+                    Color.clear.frame(height: RepVisualSystem.mainTabBarReservedHeight)
                 }
-                .repPrimaryButton()
-                .tint(routine.colorPreset.color)
-                .controlSize(.large)
-                .padding(.horizontal)
-                .padding(.vertical, 10)
-                .padding(.bottom, RepVisualSystem.mainTabBarReservedHeight)
-                .disabled(orderedExercises.isEmpty)
             }
         }
         .sheet(isPresented: $isChoosingExercise) {
@@ -331,6 +329,7 @@ private struct RoutineExerciseConfigurationView: View {
                 }
             }
             .repThemedList()
+            .contentMargins(.bottom, RepVisualSystem.pageSpacing, for: .scrollContent)
             .background(RepScreenBackground())
             .navigationTitle("Exercise Setup")
             .navigationBarTitleDisplayMode(.inline)

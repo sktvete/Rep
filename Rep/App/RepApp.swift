@@ -122,22 +122,24 @@ private struct AppRootView: View {
                         )
                 }
                 .simultaneousGesture(mainScreenPager(width: geometry.size.width))
-                .safeAreaInset(edge: .bottom, spacing: 0) {
-                    VStack(spacing: 0) {
-                        if let restTimer = restTimerBridge.presentedTimer, restTimer.isPresented {
-                            WorkoutRestTimerBanner(restTimer: restTimer)
-                                .transition(.move(edge: .bottom).combined(with: .opacity))
-                        }
-
-                        RepTransparentTabBar(
-                            selection: selectedTab,
-                            hasActiveWorkout: presentedWorkout != nil,
-                            onSelect: selectTab
-                        )
-                    }
-                    .animation(.snappy(duration: 0.25), value: restTimerBridge.presentedTimer?.isPresented ?? false)
-                }
             }
+
+            VStack(spacing: 0) {
+                Spacer(minLength: 0)
+
+                if let restTimer = restTimerBridge.presentedTimer, restTimer.isPresented {
+                    WorkoutRestTimerBanner(restTimer: restTimer)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+
+                RepTransparentTabBar(
+                    selection: selectedTab,
+                    hasActiveWorkout: presentedWorkout != nil,
+                    onSelect: selectTab
+                )
+            }
+            .animation(.snappy(duration: 0.25), value: restTimerBridge.presentedTimer?.isPresented ?? false)
+            .allowsHitTesting(true)
 
             if isPreparingApp {
                 RepStartupView()
@@ -398,10 +400,14 @@ private extension View {
         width: CGFloat,
         dragOffset: CGFloat
     ) -> some View {
-        offset(x: CGFloat(tab.rawValue - selection.rawValue) * width + dragOffset)
-            .allowsHitTesting(selection == tab)
-            .accessibilityHidden(selection != tab)
-            .zIndex(selection == tab ? 1 : 0)
+        // Clear inset so UIKit-backed List/Form content can scroll above the overlay tab bar.
+        safeAreaInset(edge: .bottom, spacing: 0) {
+            Color.clear.frame(height: RepVisualSystem.mainTabBarReservedHeight)
+        }
+        .offset(x: CGFloat(tab.rawValue - selection.rawValue) * width + dragOffset)
+        .allowsHitTesting(selection == tab)
+        .accessibilityHidden(selection != tab)
+        .zIndex(selection == tab ? 1 : 0)
     }
 }
 

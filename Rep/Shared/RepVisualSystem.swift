@@ -5,7 +5,8 @@ enum RepVisualSystem {
     static let cardRadius: CGFloat = 22
     static let controlRadius: CGFloat = 16
     static let pageSpacing: CGFloat = 20
-    static let mainTabBarReservedHeight: CGFloat = 74
+    /// Floating tab bar + home-indicator clearance for overlay chrome.
+    static let mainTabBarReservedHeight: CGFloat = 108
 }
 
 private struct RepMainNavigationTitleModifier: ViewModifier {
@@ -40,7 +41,8 @@ struct RepScreenBackground: View {
 
     var body: some View {
         theme.canvasColor
-            .ignoresSafeArea()
+            // Avoid `.bottom` so tab-page backgrounds can't expand under the tab bar.
+            .ignoresSafeArea(edges: [.top, .horizontal])
     }
 }
 
@@ -212,7 +214,8 @@ private struct RepSoftScrollEdgeModifier: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
         if #available(iOS 26.0, *) {
-            content.scrollEdgeEffectStyle(.soft, for: [.top, .bottom])
+            // Soft bottom fade hides the last rows under the floating tab bar.
+            content.scrollEdgeEffectStyle(.soft, for: .top)
         } else {
             content
         }
@@ -288,7 +291,11 @@ extension View {
         self
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
-            .contentMargins(.bottom, RepVisualSystem.pageSpacing, for: .scrollContent)
+            .contentMargins(
+                .bottom,
+                RepVisualSystem.mainTabBarReservedHeight,
+                for: .scrollContent
+            )
             .repSoftScrollEdges()
     }
 

@@ -65,15 +65,15 @@ struct TodayView: View {
                     .scrollIndicators(.hidden)
                     .repSoftScrollEdges()
                 } else {
-                    // Roomier layout when it fits; compact fallback keeps This Week on-screen.
-                    ViewThatFits(in: .vertical) {
-                        idleTodayContent(compact: false)
-                        idleTodayContent(compact: true)
+                    ScrollView {
+                        idleTodayContent()
+                            .padding(.horizontal)
+                            .padding(.top, 4)
+                            .padding(.bottom, 12)
                     }
-                    .padding(.horizontal)
-                    .padding(.top, 2)
-                    .padding(.bottom, 2)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .scrollIndicators(.hidden)
+                    .scrollBounceBehavior(.basedOnSize)
+                    .repSoftScrollEdges()
                 }
             }
             .repMainNavigationTitle("Today")
@@ -103,8 +103,8 @@ struct TodayView: View {
     }
 
     @ViewBuilder
-    private func idleTodayContent(compact: Bool) -> some View {
-        VStack(spacing: compact ? 8 : 10) {
+    private func idleTodayContent() -> some View {
+        VStack(spacing: 16) {
             StartWorkoutCard(
                 hasRoutines: !activeRoutines.isEmpty,
                 suggestedRoutine: suggestedRoutine,
@@ -113,16 +113,13 @@ struct TodayView: View {
                 onSuggestionNotToday: suggestion.map { s in { recordDismissal(of: s, suppress: false) } },
                 onStopSuggesting: suggestion.map { s in { recordDismissal(of: s, suppress: true) } },
                 onChooseRoutine: { isChoosingRoutine = true },
-                onStartEmpty: startEmptyWorkout,
-                compact: compact
+                onStartEmpty: startEmptyWorkout
             )
-            .layoutPriority(1)
 
             WeeklyActivityCard(
                 completedSessions: sessions.filter { $0.state == .completed },
                 compact: true
             )
-            .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -224,23 +221,15 @@ private struct StartWorkoutCard: View {
     var onStopSuggesting: (() -> Void)?
     let onChooseRoutine: () -> Void
     let onStartEmpty: () -> Void
-    var compact = false
-
-    private var mascotSize: CGFloat {
-        if compact { return hasRoutines ? 88 : 104 }
-        return hasRoutines ? 118 : 148
-    }
 
     var body: some View {
-        VStack(spacing: compact ? 8 : 12) {
-            if !compact { Spacer(minLength: 4) }
-
-            RepMascot(pose: .welcome, size: mascotSize)
+        VStack(spacing: 16) {
+            RepMascot(pose: .welcome, size: hasRoutines ? 88 : 100)
                 .accessibilityHidden(true)
 
-            VStack(spacing: 4) {
+            VStack(spacing: 6) {
                 Text("Ready when you are")
-                    .font((compact ? Font.title3 : Font.title2).bold())
+                    .font(.title2.bold())
                     .fontDesign(.rounded)
                     .multilineTextAlignment(.center)
                 Text(
@@ -251,14 +240,11 @@ private struct StartWorkoutCard: View {
                 .font(.subheadline)
                 .repSecondaryText()
                 .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .minimumScaleFactor(0.85)
+                .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.horizontal, 4)
 
-            if !compact { Spacer(minLength: 4) }
-
-            VStack(spacing: compact ? 8 : 10) {
+            VStack(spacing: 10) {
                 if let suggestedRoutine, let onStartSuggested {
                     HStack(spacing: 10) {
                         Button(action: onStartSuggested) {
@@ -266,7 +252,7 @@ private struct StartWorkoutCard: View {
                                 .frame(maxWidth: .infinity)
                         }
                         .repSecondaryButton()
-                        .controlSize(compact ? .regular : .large)
+                        .controlSize(.large)
                         .accessibilityHint("Starts this routine based on your workout history")
 
                         if onSuggestionWhy != nil || onSuggestionNotToday != nil || onStopSuggesting != nil {
@@ -295,21 +281,21 @@ private struct StartWorkoutCard: View {
                     }
                 }
 
-                    if hasRoutines {
-                        Button(action: onChooseRoutine) {
-                            Label("Choose Routine", systemImage: "list.bullet.rectangle")
-                                .frame(maxWidth: .infinity)
-                                .font(.headline)
-                        }
-                        .repPrimaryButton()
-                        .controlSize(compact ? .regular : .large)
+                if hasRoutines {
+                    Button(action: onChooseRoutine) {
+                        Label("Choose Routine", systemImage: "list.bullet.rectangle")
+                            .frame(maxWidth: .infinity)
+                            .font(.headline)
+                    }
+                    .repPrimaryButton()
+                    .controlSize(.large)
 
-                        Button(action: onStartEmpty) {
-                            Label("Start Empty Workout", systemImage: "plus")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .repSecondaryButton()
-                        .controlSize(.regular)
+                    Button(action: onStartEmpty) {
+                        Label("Start Empty Workout", systemImage: "plus")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .repSecondaryButton()
+                    .controlSize(.regular)
                 } else {
                     Button(action: onStartEmpty) {
                         Label("Start Empty Workout", systemImage: "play.fill")
@@ -317,13 +303,13 @@ private struct StartWorkoutCard: View {
                             .font(.headline)
                     }
                     .repPrimaryButton()
-                    .controlSize(compact ? .regular : .large)
+                    .controlSize(.large)
                 }
             }
         }
         .padding(.horizontal, 18)
-        .padding(.vertical, compact ? 12 : 18)
-        .frame(maxWidth: .infinity, maxHeight: compact ? nil : .infinity)
+        .padding(.vertical, 20)
+        .frame(maxWidth: .infinity)
         .repSurface()
     }
 }

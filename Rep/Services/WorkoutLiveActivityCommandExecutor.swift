@@ -310,6 +310,7 @@ enum WorkoutLiveActivityCommandExecutor {
             RestTimerNotificationManager.schedule(sessionID: sessionUUID, at: endDate)
         }
 
+        RestTimerLiveActivityManager.announceSetLogged(sessionID: sessionUUID)
         try context.save()
     }
 

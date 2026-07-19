@@ -7,6 +7,7 @@ enum ExercisePickerSessionCache {
     static let searchModel = ExercisePickerSearchModel()
     private static var usage: [UUID: Int] = [:]
     private static var isWarmed = false
+    private static var didPrefetchLeadingThumbnails = false
     private static var warmTask: Task<Void, Never>?
 
     static var hasWarmBrowseList: Bool { isWarmed && !searchModel.displayed.isEmpty }
@@ -18,6 +19,7 @@ enum ExercisePickerSessionCache {
         searchModel.prewarm(exercises: exercises)
         searchModel.refresh(exercises: exercises, query: "", immediate: true)
         isWarmed = true
+        prefetchLeadingThumbnailsIfNeeded()
     }
 
     static func scheduleWarm(exercises: [Exercise], in context: ModelContext) {
@@ -37,12 +39,16 @@ enum ExercisePickerSessionCache {
             isWarmed = true
         }
         searchModel.refresh(exercises: exercises, query: query, immediate: query.isEmpty)
+        if query.isEmpty {
+            prefetchLeadingThumbnailsIfNeeded()
+        }
     }
 
     static func invalidateUsage() {
         ExerciseUsageService.invalidateCache()
         usage = [:]
         isWarmed = false
+        didPrefetchLeadingThumbnails = false
         searchModel.setUsage([:])
     }
 
@@ -52,6 +58,14 @@ enum ExercisePickerSessionCache {
         ExerciseUsageService.invalidateCache()
         usage = [:]
         isWarmed = false
+        didPrefetchLeadingThumbnails = false
         searchModel.reset()
+    }
+
+    private static func prefetchLeadingThumbnailsIfNeeded() {
+        guard !didPrefetchLeadingThumbnails else { return }
+        guard !searchModel.displayed.isEmpty else { return }
+        didPrefetchLeadingThumbnails = true
+        ExerciseThumbnailPrefetch.prefetchLeading(from: searchModel.displayed)
     }
 }

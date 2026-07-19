@@ -7,6 +7,8 @@ struct RestTimerLiveActivityWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: RestTimerAttributes.self) { context in
             RestTimerLockScreenView(context: context)
+                // Let Lock Screen wallpaper show through so control materials read as glass.
+                .activityBackgroundTint(.black.opacity(0.18))
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
@@ -90,6 +92,12 @@ private struct RestTimerLockScreenView: View {
 
                 Spacer(minLength: 8)
 
+                if context.state.showsLoggedConfirmation {
+                    LoggedConfirmationBadge(
+                        confirmationID: context.state.loggedConfirmationID
+                    )
+                }
+
                 IslandTimerText(context: context, size: 21, weight: .bold, forLockScreen: true)
 
                 if context.state.isResting {
@@ -111,6 +119,31 @@ private struct RestTimerLockScreenView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+        .animation(
+            .spring(response: 0.32, dampingFraction: 0.72),
+            value: context.state.showsLoggedConfirmation
+        )
+        .animation(
+            .spring(response: 0.32, dampingFraction: 0.72),
+            value: context.state.loggedConfirmationID
+        )
+    }
+}
+
+private struct LoggedConfirmationBadge: View {
+    let confirmationID: Int
+
+    var body: some View {
+        Label("Logged", systemImage: "checkmark.circle.fill")
+            .font(.caption.weight(.bold))
+            .foregroundStyle(.green)
+            .labelStyle(.titleAndIcon)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(.green.opacity(0.16), in: Capsule())
+            .symbolEffect(.bounce, value: confirmationID)
+            .transition(.scale(scale: 0.72).combined(with: .opacity))
+            .accessibilityLabel("Set logged")
     }
 }
 
@@ -127,8 +160,9 @@ private struct RestTimerQuickControls: View {
                 Text("+15")
                     .font(.caption.weight(.bold).monospacedDigit())
                     .frame(minWidth: compact ? 34 : 40, minHeight: compact ? 28 : 32)
+                    .padding(.horizontal, 4)
             }
-            .buttonStyle(.bordered)
+            .liveActivityGlassControl(shape: .capsule)
             .accessibilityLabel("Add 15 seconds")
 
             Button(
@@ -138,7 +172,7 @@ private struct RestTimerQuickControls: View {
                     .font(.caption.weight(.semibold))
                     .frame(width: compact ? 28 : 32, height: compact ? 28 : 32)
             }
-            .buttonStyle(.bordered)
+            .liveActivityGlassControl(shape: .circle)
             .accessibilityLabel(isPaused ? "Resume rest" : "Pause rest")
         }
     }
@@ -204,7 +238,7 @@ private struct WorkoutSetControls: View {
                         .font(.caption.weight(.bold))
                         .frame(maxWidth: .infinity, minHeight: compact ? 30 : 32)
                 }
-                .buttonStyle(.bordered)
+                .liveActivityGlassControl(shape: .capsule)
                 .accessibilityLabel("Complete set and do another \(set.exerciseName)")
 
                 Button(
@@ -216,9 +250,9 @@ private struct WorkoutSetControls: View {
                     Label("Next", systemImage: "checkmark")
                         .font(.caption.weight(.bold))
                         .frame(maxWidth: .infinity, minHeight: compact ? 30 : 32)
+                        .foregroundStyle(.white)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.green)
+                .liveActivityGlassControl(shape: .capsule, prominent: true)
                 .accessibilityLabel("Complete set and move to the next set")
             }
         }
@@ -262,7 +296,7 @@ private struct WorkoutSetControls: View {
             )
         }
         .padding(3)
-        .background(.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+        .liveActivityGlassSurface(cornerRadius: 10)
     }
 
     private func intentButton<Intent: AppIntent>(
@@ -276,8 +310,57 @@ private struct WorkoutSetControls: View {
                 .frame(width: 28, height: 28)
                 .contentShape(.circle)
         }
-        .buttonStyle(.plain)
+        // Keep ± as plain + shared surface glass so App Intents stay tappable.
+        .buttonStyle(LiveActivityBobButtonStyle())
         .accessibilityLabel(accessibilityLabel)
+    }
+}
+
+/// Classic press bob for Lock Screen ± — local scale only (no nested glass).
+private struct LiveActivityBobButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.78 : 1)
+            .animation(
+                .spring(response: 0.22, dampingFraction: 0.52),
+                value: configuration.isPressed
+            )
+    }
+}
+
+private enum LiveActivityGlassShape {
+    case capsule
+    case circle
+}
+
+private extension View {
+    /// Frosted control chrome for Live Activities.
+    /// Note: `.buttonStyle(.glass)` and view-level `glassEffect` on App Intent
+    /// buttons blank out / break Lock Screen controls — use materials instead.
+    @ViewBuilder
+    func liveActivityGlassControl(
+        shape: LiveActivityGlassShape,
+        prominent: Bool = false
+    ) -> some View {
+        buttonStyle(.plain)
+            .background {
+                switch shape {
+                case .capsule where prominent:
+                    ZStack {
+                        Capsule().fill(.green.opacity(0.72))
+                        Capsule().fill(.ultraThinMaterial.opacity(0.55))
+                    }
+                case .capsule:
+                    Capsule().fill(.regularMaterial)
+                case .circle:
+                    Circle().fill(.regularMaterial)
+                }
+            }
+    }
+
+    @ViewBuilder
+    func liveActivityGlassSurface(cornerRadius: CGFloat) -> some View {
+        background(.regularMaterial, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
 }
 

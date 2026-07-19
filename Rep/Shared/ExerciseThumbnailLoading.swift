@@ -136,6 +136,31 @@ enum ExerciseThumbnailPrefetch {
             return (index, url, maxPixel)
         }
     }
+
+    /// Loads the leading picker rows into `ExerciseThumbnailCache` so Add Exercise opens warm.
+    @MainActor
+    static func prefetchLeading(
+        from exercises: [Exercise],
+        count: Int = 10,
+        thumbnailSize: CGFloat = 58
+    ) {
+        let sources = sources(
+            from: Array(exercises.prefix(count)),
+            thumbnailSize: thumbnailSize
+        )
+        guard !sources.isEmpty else { return }
+
+        Task {
+            for item in sources {
+                guard !Task.isCancelled else { return }
+                _ = await ExerciseThumbnailCache.shared.thumbnail(
+                    for: item.url,
+                    maxPixelSize: item.maxPixel,
+                    priority: .prefetch(listIndex: item.index)
+                )
+            }
+        }
+    }
 }
 
 private struct ExerciseThumbnailScopeIDKey: EnvironmentKey {

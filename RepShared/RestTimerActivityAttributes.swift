@@ -9,6 +9,41 @@ struct RestTimerAttributes: ActivityAttributes {
         var nextExerciseName: String
         var isResting: Bool
         var currentSet: WorkoutLiveActivitySet?
+        /// Bumped when a set is logged from Lock Screen so the widget can animate.
+        var loggedConfirmationID: Int
+        var showsLoggedConfirmation: Bool
+
+        init(
+            timerInterval: ClosedRange<Date>,
+            isPaused: Bool,
+            pausedRemainingSeconds: Int?,
+            nextExerciseName: String,
+            isResting: Bool,
+            currentSet: WorkoutLiveActivitySet?,
+            loggedConfirmationID: Int = 0,
+            showsLoggedConfirmation: Bool = false
+        ) {
+            self.timerInterval = timerInterval
+            self.isPaused = isPaused
+            self.pausedRemainingSeconds = pausedRemainingSeconds
+            self.nextExerciseName = nextExerciseName
+            self.isResting = isResting
+            self.currentSet = currentSet
+            self.loggedConfirmationID = loggedConfirmationID
+            self.showsLoggedConfirmation = showsLoggedConfirmation
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            timerInterval = try container.decode(ClosedRange<Date>.self, forKey: .timerInterval)
+            isPaused = try container.decode(Bool.self, forKey: .isPaused)
+            pausedRemainingSeconds = try container.decodeIfPresent(Int.self, forKey: .pausedRemainingSeconds)
+            nextExerciseName = try container.decode(String.self, forKey: .nextExerciseName)
+            isResting = try container.decode(Bool.self, forKey: .isResting)
+            currentSet = try container.decodeIfPresent(WorkoutLiveActivitySet.self, forKey: .currentSet)
+            loggedConfirmationID = try container.decodeIfPresent(Int.self, forKey: .loggedConfirmationID) ?? 0
+            showsLoggedConfirmation = try container.decodeIfPresent(Bool.self, forKey: .showsLoggedConfirmation) ?? false
+        }
     }
 
     var sessionID: String

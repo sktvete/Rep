@@ -69,6 +69,11 @@ enum RestTimerLiveActivityManager {
         )
     }
 
+    /// Brief Lock Screen “Logged” confirmation after Another / Next.
+    static func announceSetLogged(sessionID: UUID) {
+        Task { await coordinator.announceSetLogged(sessionKey: sessionID.uuidString) }
+    }
+
     static func togglePauseFromIntent(sessionID: UUID) async {
         await coordinator.togglePauseFromIntent(sessionKey: sessionID.uuidString)
     }
@@ -91,6 +96,8 @@ enum RestTimerLiveActivityManager {
     }
 
     private actor Coordinator {
+        private var clearLoggedConfirmationTask: Task<Void, Never>?
+
         func reconcileOnLaunch() async {
             let defaults = UserDefaults.standard
             let values = defaults.dictionaryRepresentation()
@@ -256,6 +263,37 @@ enum RestTimerLiveActivityManager {
                 nextExerciseName: nextExerciseName
             )
             return endDate
+        }
+
+        func announceSetLogged(sessionKey: String) async {
+            // Let any fire-and-forget Live Activity sync from the in-app timer settle first.
+            try? await Task.sleep(for: .milliseconds(80))
+            await setShowsLoggedConfirmation(sessionKey: sessionKey, show: true)
+
+            clearLoggedConfirmationTask?.cancel()
+            clearLoggedConfirmationTask = Task {
+                try? await Task.sleep(for: .milliseconds(1_200))
+                guard !Task.isCancelled else { return }
+                await setShowsLoggedConfirmation(sessionKey: sessionKey, show: false)
+            }
+        }
+
+        private func setShowsLoggedConfirmation(sessionKey: String, show: Bool) async {
+            guard let activity = Self.activity(for: sessionKey) else { return }
+            var state = activity.content.state
+            if show {
+                state.loggedConfirmationID &+= 1
+                state.showsLoggedConfirmation = true
+            } else {
+                state.showsLoggedConfirmation = false
+            }
+            await updateRestTimerActivity(
+                activity,
+                content: ActivityContent(
+                    state: state,
+                    staleDate: activity.content.staleDate
+                )
+            )
         }
 
         func togglePauseFromIntent(sessionKey: String) async {

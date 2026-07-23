@@ -33,7 +33,7 @@ struct RoutinesView: View {
                             description: showsArchivedRoutines
                                 ? "Archived routines will appear here."
                                 : "Save the exercises you train together, then start in one tap.",
-                            actionTitle: showsArchivedRoutines ? nil : "Create Routine",
+                            actionTitle: showsArchivedRoutines ? nil : "Build My First Routine",
                             actionSystemImage: "plus",
                             action: showsArchivedRoutines ? nil : { isCreatingRoutine = true }
                         )
@@ -113,7 +113,7 @@ struct RoutinesView: View {
                 }
             }
             .sheet(isPresented: $isCreatingRoutine) {
-                CreateRoutineView()
+                RoutineCreationFlowView()
             }
             .alert(
                 "Delete routine?",

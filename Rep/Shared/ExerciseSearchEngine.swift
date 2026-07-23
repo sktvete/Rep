@@ -452,15 +452,30 @@ final class ExerciseSearchIndex {
         }
 
         cachedCandidates = exercises.map { exercise in
-            SearchCandidate(
+            let document = document(for: exercise)
+            return SearchCandidate(
                 id: exercise.id,
-                document: document(for: exercise),
+                document: document,
                 popularityRank: exercise.popularityRank,
-                namePhrase: ExerciseSearchEngine.normalize(exercise.name)
+                namePhrase: ExerciseSearchEngine.normalize(exercise.name),
+                prefixKeys: Self.prefixKeys(for: document)
             )
         }
         candidatesKey = key
         return cachedCandidates
+    }
+
+    private static func prefixKeys(for document: ExerciseSearchEngine.SearchDocument) -> [String] {
+        var keys = Set<String>()
+        let pools = document.nameTokens + document.aliasTokens + document.muscleTokens + document.equipmentTokens
+        for token in pools where token.count >= 2 {
+            keys.insert(String(token.prefix(2)))
+        }
+        let compact = document.nameCompact
+        if compact.count >= 2 {
+            keys.insert(String(compact.prefix(2)))
+        }
+        return Array(keys)
     }
 
     func prewarm(for exercises: [Exercise]) {
@@ -504,6 +519,8 @@ struct SearchCandidate: Sendable {
     let document: ExerciseSearchEngine.SearchDocument
     let popularityRank: Int
     let namePhrase: String
+    /// First two characters of every searchable token — used to skip cold scans.
+    let prefixKeys: [String]
 }
 
 extension ExerciseSearchEngine {
@@ -529,10 +546,11 @@ extension ExerciseSearchEngine {
         let queryTokens = tokens(in: queryPhrase)
         guard !queryTokens.isEmpty else { return [] }
 
+        let scoped = scopedCandidates(candidates, queryTokens: queryTokens)
         var ranked: [RankedSearchID] = []
-        ranked.reserveCapacity(min(limit * 2, candidates.count))
+        ranked.reserveCapacity(min(limit * 2, scoped.count))
 
-        for (index, candidate) in candidates.enumerated() {
+        for (index, candidate) in scoped.enumerated() {
             if index.isMultiple(of: 32) {
                 try Task.checkCancellation()
             }
@@ -565,6 +583,18 @@ extension ExerciseSearchEngine {
         }
         try Task.checkCancellation()
         return ranked.map(\.id)
+    }
+
+    /// Prefer candidates whose tokens share a 2-char prefix with the query.
+    private static func scopedCandidates(
+        _ candidates: [SearchCandidate],
+        queryTokens: [String]
+    ) -> [SearchCandidate] {
+        guard let first = queryTokens.first, first.count >= 2 else { return candidates }
+        let key = String(first.prefix(2))
+        let filtered = candidates.filter { $0.prefixKeys.contains(key) }
+        // Fall back if the prefix index is too aggressive (typos / short aliases).
+        return filtered.count >= 8 ? filtered : candidates
     }
 
     private struct RankedSearchID: Sendable {

@@ -54,6 +54,36 @@ enum RestTimerLiveActivityManager {
         )
     }
 
+    /// Paints Lock Screen weight immediately from ActivityKit state before SwiftData.
+    static func applyWeightDeltaFromIntent(
+        sessionID: UUID,
+        setID: String,
+        delta: Double
+    ) async {
+        await coordinator.applySetDelta(
+            sessionKey: sessionID.uuidString,
+            setID: setID
+        ) { set in
+            let current = set.displayedWeight ?? 0
+            set.displayedWeight = max(0, current + delta)
+        }
+    }
+
+    /// Paints Lock Screen reps immediately from ActivityKit state before SwiftData.
+    static func applyRepetitionsDeltaFromIntent(
+        sessionID: UUID,
+        setID: String,
+        delta: Int
+    ) async {
+        await coordinator.applySetDelta(
+            sessionKey: sessionID.uuidString,
+            setID: setID
+        ) { set in
+            let adjusted = max(0, (set.repetitions ?? 0) + delta)
+            set.repetitions = adjusted == 0 ? nil : adjusted
+        }
+    }
+
     /// Starts a rest period from an App Intent and writes the same persisted
     /// timer shape used by `WorkoutRestTimerViewModel`, so the in-app timer can
     /// take over without jumping when the app becomes active again.
@@ -72,6 +102,23 @@ enum RestTimerLiveActivityManager {
     /// Brief Lock Screen “Logged” confirmation after Another / Next.
     static func announceSetLogged(sessionID: UUID) {
         Task { await coordinator.announceSetLogged(sessionKey: sessionID.uuidString) }
+    }
+
+    /// Single ActivityKit update after Next/Another: next set + Logged + rest timer.
+    static func applyCompletedSetFromIntent(
+        sessionID: UUID,
+        currentSet: WorkoutLiveActivitySet,
+        nextExerciseName: String,
+        restSeconds: Int,
+        restNextExerciseName: String
+    ) async {
+        await coordinator.applyCompletedSet(
+            sessionKey: sessionID.uuidString,
+            currentSet: currentSet,
+            nextExerciseName: nextExerciseName,
+            restSeconds: restSeconds,
+            restNextExerciseName: restNextExerciseName
+        )
     }
 
     static func togglePauseFromIntent(sessionID: UUID) async {
@@ -209,6 +256,37 @@ enum RestTimerLiveActivityManager {
             await upsertActivity(sessionKey: sessionKey, content: content)
         }
 
+        func applySetDelta(
+            sessionKey: String,
+            setID: String,
+            mutate: (inout WorkoutLiveActivitySet) -> Void
+        ) async {
+            guard let activity = Self.activity(for: sessionKey),
+                  var currentSet = activity.content.state.currentSet,
+                  currentSet.setID == setID else {
+                return
+            }
+
+            mutate(&currentSet)
+
+            var state = activity.content.state
+            state.currentSet = currentSet
+            await updateRestTimerActivity(
+                activity,
+                content: ActivityContent(
+                    state: state,
+                    staleDate: activity.content.staleDate
+                )
+            )
+
+            let nextName = workoutRecord(for: sessionKey)?.nextExerciseName
+                ?? state.nextExerciseName
+            storeWorkoutRecord(
+                WorkoutRecord(currentSet: currentSet, nextExerciseName: nextName),
+                sessionKey: sessionKey
+            )
+        }
+
         func syncWorkout(
             sessionKey: String,
             currentSet: WorkoutLiveActivitySet,
@@ -266,13 +344,72 @@ enum RestTimerLiveActivityManager {
         }
 
         func announceSetLogged(sessionKey: String) async {
-            // Let any fire-and-forget Live Activity sync from the in-app timer settle first.
-            try? await Task.sleep(for: .milliseconds(80))
             await setShowsLoggedConfirmation(sessionKey: sessionKey, show: true)
 
             clearLoggedConfirmationTask?.cancel()
             clearLoggedConfirmationTask = Task {
-                try? await Task.sleep(for: .milliseconds(1_200))
+                try? await Task.sleep(for: .milliseconds(900))
+                guard !Task.isCancelled else { return }
+                await setShowsLoggedConfirmation(sessionKey: sessionKey, show: false)
+            }
+        }
+
+        /// One Lock Screen paint for set advance + Logged + optional rest.
+        func applyCompletedSet(
+            sessionKey: String,
+            currentSet: WorkoutLiveActivitySet,
+            nextExerciseName: String,
+            restSeconds: Int,
+            restNextExerciseName: String
+        ) async {
+            storeWorkoutRecord(
+                WorkoutRecord(currentSet: currentSet, nextExerciseName: nextExerciseName),
+                sessionKey: sessionKey
+            )
+
+            clearLoggedConfirmationTask?.cancel()
+
+            let content: ActivityContent<RestTimerAttributes.ContentState>
+            if restSeconds > 0 {
+                let endDate = Date().addingTimeInterval(TimeInterval(restSeconds))
+                UserDefaults.standard.set(
+                    [
+                        "targetDate": endDate.timeIntervalSince1970,
+                        "nextExerciseName": restNextExerciseName
+                    ],
+                    forKey: timerStoragePrefix + sessionKey
+                )
+                let startDate = endDate.addingTimeInterval(-TimeInterval(restSeconds))
+                var state = RestTimerAttributes.ContentState(
+                    timerInterval: startDate...endDate,
+                    isPaused: false,
+                    pausedRemainingSeconds: nil,
+                    nextExerciseName: restNextExerciseName,
+                    isResting: true,
+                    currentSet: currentSet
+                )
+                state.loggedConfirmationID &+= 1
+                state.showsLoggedConfirmation = true
+                content = ActivityContent(state: state, staleDate: endDate)
+            } else {
+                UserDefaults.standard.removeObject(forKey: timerStoragePrefix + sessionKey)
+                var state = RestTimerAttributes.ContentState(
+                    timerInterval: Date()...Date(),
+                    isPaused: false,
+                    pausedRemainingSeconds: nil,
+                    nextExerciseName: nextExerciseName,
+                    isResting: false,
+                    currentSet: currentSet
+                )
+                state.loggedConfirmationID &+= 1
+                state.showsLoggedConfirmation = true
+                content = ActivityContent(state: state, staleDate: nil)
+            }
+
+            await upsertActivity(sessionKey: sessionKey, content: content)
+
+            clearLoggedConfirmationTask = Task {
+                try? await Task.sleep(for: .milliseconds(900))
                 guard !Task.isCancelled else { return }
                 await setShowsLoggedConfirmation(sessionKey: sessionKey, show: false)
             }

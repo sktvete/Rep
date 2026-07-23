@@ -18,9 +18,10 @@ final class ExercisePickerSearchModel {
     private var catalogKey: UInt64 = 0
     private var usage: [UUID: Int] = [:]
 
-    static let browseLimit = 120
-    static let searchLimit = 150
-    static let searchDebounce: Duration = .milliseconds(300)
+    static let browseLimit = 80
+    static let searchLimit = 48
+    /// Short enough to feel live; long enough that mid-word keystrokes cancel prior work.
+    static let searchDebounce: Duration = .milliseconds(120)
 
     func setUsage(_ usage: [UUID: Int]) {
         guard self.usage != usage else { return }

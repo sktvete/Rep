@@ -106,19 +106,18 @@ struct ExercisePickerRow: View {
 
 struct ExerciseMediaThumbnail: View {
     let exercise: Exercise
-    var size: CGFloat = 58
+    var size: CGFloat = ExerciseThumbnailSizing.pickerPointSize
     var loadsImage: Bool = true
     var listIndex: Int? = nil
 
     private var mediaURL: URL? {
-        guard let value = exercise.mediaURLString,
-              !value.isEmpty else { return nil }
-        return URL(string: value)
+        ExerciseCatalogMedia.resolvedURL(for: exercise)
     }
 
     @Environment(\.displayScale) private var displayScale
     @Environment(\.exerciseThumbnailScopeID) private var scopeID
     @State private var image: UIImage?
+    @State private var loadedURL: URL?
     @State private var didFail = false
     @State private var isOnScreen = false
 
@@ -132,7 +131,6 @@ struct ExerciseMediaThumbnail: View {
                 placeholder
             } else {
                 placeholder
-                    .overlay { ProgressView().controlSize(.small) }
             }
         }
         .frame(width: size, height: size)
@@ -148,28 +146,61 @@ struct ExerciseMediaThumbnail: View {
             if let scopeID, let listIndex {
                 ExerciseThumbnailListTracker.shared.registerVisibleRow(scopeID: scopeID, index: listIndex)
             }
+            applyCachedImageIfAvailable()
         }
         .onDisappear {
             isOnScreen = false
         }
         .task(id: loadTaskID) {
-            image = nil
+            guard let mediaURL else {
+                image = nil
+                loadedURL = nil
+                didFail = false
+                return
+            }
+            let maxPixel = resolvedMaxPixel
+            if let cached = ExerciseThumbnailSyncCache.image(url: mediaURL, maxPixel: maxPixel) {
+                image = cached
+                loadedURL = mediaURL
+                didFail = false
+                return
+            }
+            if loadedURL == mediaURL, image != nil {
+                return
+            }
+            // Prefetched rows paint from sync cache above. Only hit the network when allowed.
+            guard loadsImage else { return }
             didFail = false
-            guard loadsImage, let mediaURL else { return }
-            let maxPixel = size * max(1, displayScale)
-            let priority = loadPriority
             let loaded = await ExerciseThumbnailCache.shared.thumbnail(
                 for: mediaURL,
                 maxPixelSize: maxPixel,
-                priority: priority
+                priority: loadPriority
             )
             guard !Task.isCancelled else { return }
             if let loaded {
                 image = loaded
+                loadedURL = mediaURL
             } else {
                 didFail = true
             }
         }
+    }
+
+    private var resolvedMaxPixel: CGFloat {
+        size == ExerciseThumbnailSizing.pickerPointSize
+            ? ExerciseThumbnailSizing.pickerMaxPixel
+            : min(64, size * min(displayScale, 2))
+    }
+
+    private func applyCachedImageIfAvailable() {
+        guard let mediaURL else { return }
+        guard let cached = ExerciseThumbnailSyncCache.image(
+            url: mediaURL,
+            maxPixel: resolvedMaxPixel
+        ) else { return }
+        image = cached
+        loadedURL = mediaURL
+        didFail = false
     }
 
     private var loadPriority: ExerciseThumbnailLoadPriority {
@@ -217,11 +248,11 @@ struct ExerciseMediaThumbnail: View {
 
 /// Loads and caches small, static exercise thumbnails.
 ///
-/// Catalog media are animated GIFs. Rendering hundreds of them with `AsyncImage` decodes
-/// every frame and thrashes memory while the list scrolls. This cache downsamples just
-/// the first frame to the displayed size via ImageIO and keeps results in memory, so the
-/// picker stays smooth even with the full catalog. On-disk byte caching is handled by the
-/// shared `URLCache`.
+/// Media can be animated GIFs or pinned catalog JPEGs. Rendering animated media directly
+/// in hundreds of rows decodes every frame and thrashes memory while the list scrolls.
+/// This cache downsamples only the first frame to the displayed size via ImageIO and keeps
+/// results in memory, so scrolling rows remain static and smooth. On-disk byte caching is
+/// handled by the shared `URLCache`.
 ///
 /// Loads are prioritized: on-screen rows first, then a short prefetch window below the
 /// fold, then everything else.
@@ -240,12 +271,14 @@ actor ExerciseThumbnailCache {
     private var waiters: [String: [CheckedContinuation<UIImage?, Never>]] = [:]
     private var inFlight: Set<String> = []
     private var activeCount = 0
-    private let maxConcurrent = 6
+    /// Keep decode concurrency low — ImageIO on GIFs is the list hitch source.
+    private let maxConcurrent = 2
     private let session: URLSession
 
     init(session: URLSession = .shared) {
         self.session = session
-        memory.countLimit = 400
+        memory.countLimit = 320
+        memory.totalCostLimit = 32 * 1_024 * 1_024
     }
 
     func thumbnail(
@@ -253,10 +286,14 @@ actor ExerciseThumbnailCache {
         maxPixelSize: CGFloat,
         priority: ExerciseThumbnailLoadPriority = .background
     ) async -> UIImage? {
-        let maxPixel = max(1, maxPixelSize)
-        let key = cacheKey(url: url, maxPixel: maxPixel)
+        let maxPixel = ExerciseThumbnailSizing.canonicalPixelSize(maxPixelSize)
+        let key = ExerciseThumbnailSizing.cacheKey(url: url, maxPixel: maxPixel)
 
         if let cached = memory.object(forKey: key as NSString) { return cached }
+        if let synced = ExerciseThumbnailSyncCache.image(forKey: key) {
+            memory.setObject(synced, forKey: key as NSString)
+            return synced
+        }
         if inFlight.contains(key) {
             return await wait(for: key, url: url, maxPixel: maxPixel, priority: priority)
         }
@@ -283,13 +320,13 @@ actor ExerciseThumbnailCache {
         priority: ExerciseThumbnailLoadPriority
     ) {
         if let index = queue.firstIndex(where: { $0.key == key }) {
-            if priority > queue[index].priority {
+            if priority < queue[index].priority {
                 queue[index].priority = priority
-                queue.sort { $0.priority > $1.priority }
+                queue.sort { $0.priority < $1.priority }
             }
         } else {
             queue.append(QueuedLoad(key: key, url: url, maxPixel: maxPixel, priority: priority))
-            queue.sort { $0.priority > $1.priority }
+            queue.sort { $0.priority < $1.priority }
         }
         drain()
     }
@@ -328,7 +365,9 @@ actor ExerciseThumbnailCache {
         inFlight.remove(key)
         activeCount = max(0, activeCount - 1)
         if let image {
-            memory.setObject(image, forKey: key as NSString)
+            let cost = image.cgImage.map { $0.bytesPerRow * $0.height } ?? 0
+            memory.setObject(image, forKey: key as NSString, cost: cost)
+            ExerciseThumbnailSyncCache.store(image, forKey: key)
         }
         let continuations = waiters.removeValue(forKey: key) ?? []
         for continuation in continuations {
@@ -339,6 +378,7 @@ actor ExerciseThumbnailCache {
 
     func clearMemory() {
         memory.removeAllObjects()
+        ExerciseThumbnailSyncCache.clear()
         queue.removeAll()
         inFlight.removeAll()
         activeCount = 0
@@ -348,10 +388,6 @@ actor ExerciseThumbnailCache {
             }
         }
         waiters.removeAll()
-    }
-
-    private func cacheKey(url: URL, maxPixel: CGFloat) -> String {
-        "\(url.absoluteString)|\(Int(maxPixel))"
     }
 
     private static func fetchImage(
@@ -446,18 +482,11 @@ struct ExerciseAnimatedMediaView: UIViewRepresentable {
 
 struct ExerciseDetailView: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var modelContext
 
     let exercise: Exercise
 
-    @State private var catalogService = ExerciseDBCatalogService()
-    @State private var isLoadingReference = false
-    @State private var referenceError: String?
-
     private var mediaURL: URL? {
-        guard let value = exercise.mediaURLString,
-              !value.isEmpty else { return nil }
-        return URL(string: value)
+        ExerciseCatalogMedia.resolvedURL(for: exercise)
     }
 
     private var sourceURL: URL? {
@@ -556,9 +585,6 @@ struct ExerciseDetailView: View {
                     Button("Done") { dismiss() }
                 }
             }
-            .task(id: exercise.mediaURLString) {
-                await loadReferenceIfNeeded()
-            }
         }
     }
 
@@ -589,51 +615,19 @@ struct ExerciseDetailView: View {
             }
         } else {
             VStack(spacing: 10) {
-                if isLoadingReference {
-                    ProgressView()
-                        .controlSize(.large)
-                    Text("Loading movement reference…")
-                        .font(.subheadline.weight(.medium))
-                        .repSecondaryText()
-                } else {
-                    Image(systemName: "figure.strengthtraining.traditional")
-                        .font(.system(size: 42, weight: .medium))
-                        .foregroundStyle(.tint)
-                    Text(referenceError ?? "Movement reference coming soon")
-                        .font(.subheadline.weight(.medium))
-                        .repSecondaryText()
-                        .multilineTextAlignment(.center)
-                    if referenceError != nil {
-                        Button("Try Again") {
-                            Task { await loadReferenceIfNeeded() }
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                }
+                Image(systemName: "figure.strengthtraining.traditional")
+                    .font(.system(size: 42, weight: .medium))
+                    .foregroundStyle(.tint)
+                Text("Movement reference coming soon")
+                    .font(.subheadline.weight(.medium))
+                    .repSecondaryText()
+                    .multilineTextAlignment(.center)
             }
             .padding()
             .frame(maxWidth: .infinity)
             .aspectRatio(4 / 3, contentMode: .fit)
             .background(Color.accentColor.opacity(0.08))
             .clipShape(.rect(cornerRadius: RepVisualSystem.cardRadius))
-        }
-    }
-
-    private func loadReferenceIfNeeded() async {
-        guard mediaURL == nil, !isLoadingReference else { return }
-        isLoadingReference = true
-        referenceError = nil
-        defer { isLoadingReference = false }
-
-        do {
-            let loaded = try await catalogService.enrichExerciseIfNeeded(exercise, in: modelContext)
-            if !loaded, mediaURL == nil {
-                referenceError = "No movement reference is available yet."
-            }
-        } catch is CancellationError {
-            return
-        } catch {
-            referenceError = "Couldn’t load the movement reference."
         }
     }
 

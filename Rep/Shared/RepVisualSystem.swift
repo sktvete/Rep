@@ -7,6 +7,8 @@ enum RepVisualSystem {
     static let pageSpacing: CGFloat = 20
     /// Floating tab bar + home-indicator clearance for overlay chrome.
     static let mainTabBarReservedHeight: CGFloat = 108
+    /// Rest timer banner stacked above the tab bar (see `WorkoutRestTimerBanner`).
+    static let restTimerBannerReservedHeight: CGFloat = 52
 }
 
 private struct RepMainNavigationTitleModifier: ViewModifier {
@@ -184,7 +186,10 @@ private struct RepSecondaryButtonModifier: ViewModifier {
                     .tint(theme.neutralControlTint)
                     .foregroundStyle(.primary)
             } else {
-                content.buttonStyle(.glass)
+                content
+                    .buttonStyle(.glass)
+                    .tint(theme.neutralControlTint)
+                    .foregroundStyle(.primary)
             }
         } else {
             if colorScheme == .dark {
@@ -193,7 +198,10 @@ private struct RepSecondaryButtonModifier: ViewModifier {
                     .tint(theme.neutralControlTint)
                     .foregroundStyle(.primary)
             } else {
-                content.buttonStyle(.bordered)
+                content
+                    .buttonStyle(.bordered)
+                    .tint(theme.neutralControlTint)
+                    .foregroundStyle(.primary)
             }
         }
     }

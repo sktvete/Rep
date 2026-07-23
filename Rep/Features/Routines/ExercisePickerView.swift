@@ -14,7 +14,7 @@ struct ExercisePickerView: View {
     @State private var remoteSearchTask: Task<Void, Never>?
     @State private var remoteSearchGeneration: UInt64 = 0
     @State private var isRemoteSearching = false
-    @State private var thumbnailsEnabled = false
+    @State private var thumbnailsEnabled = ExercisePickerSessionCache.leadingThumbnailsReady
     @State private var prepareTask: Task<Void, Never>?
     @State private var thumbnailTask: Task<Void, Never>?
 
@@ -45,7 +45,8 @@ struct ExercisePickerView: View {
                         ForEach(Array(searchModel.displayed.enumerated()), id: \.element.id) { index, exercise in
                             ExercisePickerRow(
                                 exercise: exercise,
-                                loadsImages: thumbnailsEnabled,
+                                loadsImages: searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                    && thumbnailsEnabled,
                                 listIndex: index,
                                 onSelect: { onSelect(exercise) },
                                 onShowDetails: { detailExercise = exercise }
@@ -95,20 +96,37 @@ struct ExercisePickerView: View {
                 ExerciseDetailView(exercise: exercise)
             }
             .exerciseThumbnailScope {
-                ExerciseThumbnailPrefetch.sources(from: searchModel.displayed, thumbnailSize: 58)
+                ExerciseThumbnailPrefetch.sources(
+                    from: searchModel.displayed,
+                    thumbnailSize: ExerciseThumbnailSizing.pickerPointSize
+                )
             }
             .onAppear {
-                ExercisePickerThumbnailGate.disableThumbnails(&thumbnailsEnabled, task: &thumbnailTask)
+                if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    ExercisePickerThumbnailGate.configureForBrowse(
+                        thumbnailsEnabled: &thumbnailsEnabled,
+                        task: &thumbnailTask
+                    )
+                }
                 schedulePrepare()
             }
             .onDisappear {
                 prepareTask?.cancel()
+                thumbnailTask?.cancel()
                 remoteSearchGeneration &+= 1
                 remoteSearchTask?.cancel()
                 isRemoteSearching = false
-                ExercisePickerThumbnailGate.disableThumbnails(&thumbnailsEnabled, task: &thumbnailTask)
             }
             .onChange(of: searchText) { _, newValue in
+                let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmed.isEmpty {
+                    ExercisePickerThumbnailGate.configureForBrowse(
+                        thumbnailsEnabled: &thumbnailsEnabled,
+                        task: &thumbnailTask
+                    )
+                } else {
+                    ExercisePickerThumbnailGate.disableThumbnails(&thumbnailsEnabled, task: &thumbnailTask)
+                }
                 ExercisePickerSessionCache.prepare(
                     exercises: exercises,
                     query: newValue,
@@ -117,6 +135,7 @@ struct ExercisePickerView: View {
                 scheduleRemoteSearch(for: newValue)
             }
             .onChange(of: searchModel.isRefreshing) { _, isRefreshing in
+                guard searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
                 ExercisePickerThumbnailGate.scheduleReveal(
                     thumbnailsEnabled: $thumbnailsEnabled,
                     isSearching: isRefreshing,

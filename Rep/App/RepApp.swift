@@ -65,6 +65,15 @@ private struct AppRootView: View {
     @State private var startupError: String?
     @State private var pageDragOffset: CGFloat = 0
     @State private var restTimerBridge = ActiveWorkoutRestTimerBridge.shared
+    @State private var keyboardFocusBridge = WorkoutKeyboardFocusBridge.shared
+#if DEBUG
+    @State private var screenshotCompletionSession: WorkoutSession?
+#endif
+
+    private var hidesBottomChrome: Bool {
+        // Read through the observable bridge so tab/rest chrome hide while typing.
+        keyboardFocusBridge.isSetFieldFocused
+    }
 
     var body: some View {
         ZStack {
@@ -75,7 +84,10 @@ private struct AppRootView: View {
                             ActiveWorkoutView(
                                 session: presentedWorkout,
                                 onKeyboardNavigate: navigateFromWorkoutKeyboard,
-                                onClose: { self.presentedWorkout = nil }
+                                onClose: {
+                                    self.presentedWorkout = nil
+                                    scheduleIdleThumbnailWarmIfPossible()
+                                }
                             )
                             .id(presentedWorkout.id)
                         } else {
@@ -86,7 +98,8 @@ private struct AppRootView: View {
                         .today,
                         selection: selectedTab,
                         width: geometry.size.width,
-                        dragOffset: pageDragOffset
+                        dragOffset: pageDragOffset,
+                        bottomReservedHeight: pageBottomReserve
                     )
 
                     HistoryView(onOpenWorkout: present)
@@ -94,7 +107,8 @@ private struct AppRootView: View {
                             .history,
                             selection: selectedTab,
                             width: geometry.size.width,
-                            dragOffset: pageDragOffset
+                            dragOffset: pageDragOffset,
+                            bottomReservedHeight: pageBottomReserve
                         )
 
                     TrainingProgressView()
@@ -102,7 +116,8 @@ private struct AppRootView: View {
                             .progress,
                             selection: selectedTab,
                             width: geometry.size.width,
-                            dragOffset: pageDragOffset
+                            dragOffset: pageDragOffset,
+                            bottomReservedHeight: pageBottomReserve
                         )
 
                     RoutinesView(onStartRoutine: start)
@@ -110,7 +125,8 @@ private struct AppRootView: View {
                             .routines,
                             selection: selectedTab,
                             width: geometry.size.width,
-                            dragOffset: pageDragOffset
+                            dragOffset: pageDragOffset,
+                            bottomReservedHeight: pageBottomReserve
                         )
 
                     SettingsView()
@@ -118,34 +134,54 @@ private struct AppRootView: View {
                             .settings,
                             selection: selectedTab,
                             width: geometry.size.width,
-                            dragOffset: pageDragOffset
+                            dragOffset: pageDragOffset,
+                            bottomReservedHeight: pageBottomReserve
                         )
                 }
                 .simultaneousGesture(mainScreenPager(width: geometry.size.width))
             }
 
-            VStack(spacing: 0) {
-                Spacer(minLength: 0)
+            Group {
+                if !hidesBottomChrome {
+                    VStack(spacing: 0) {
+                        Spacer(minLength: 0)
 
-                if let restTimer = restTimerBridge.presentedTimer, restTimer.isPresented {
-                    WorkoutRestTimerBanner(restTimer: restTimer)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        if let restTimer = restTimerBridge.presentedTimer, restTimer.isPresented {
+                            WorkoutRestTimerBanner(restTimer: restTimer)
+                                .transition(.move(edge: .bottom).combined(with: .opacity))
+                        }
+
+                        RepTransparentTabBar(
+                            selection: selectedTab,
+                            hasActiveWorkout: presentedWorkout != nil,
+                            onSelect: selectTab
+                        )
+                    }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .allowsHitTesting(true)
                 }
-
-                RepTransparentTabBar(
-                    selection: selectedTab,
-                    hasActiveWorkout: presentedWorkout != nil,
-                    onSelect: selectTab
-                )
             }
+            .animation(.snappy(duration: 0.22), value: hidesBottomChrome)
             .animation(.snappy(duration: 0.25), value: restTimerBridge.presentedTimer?.isPresented ?? false)
-            .allowsHitTesting(true)
 
             if isPreparingApp {
                 RepStartupView()
                     .transition(.opacity)
                     .zIndex(10)
             }
+
+#if DEBUG
+            if let screenshotCompletionSession {
+                WorkoutCompletionView(
+                    session: screenshotCompletionSession,
+                    preferredUnit: settings.first?.preferredWeightUnit ?? .kilograms
+                ) {
+                    self.screenshotCompletionSession = nil
+                }
+                .transition(.opacity)
+                .zIndex(20)
+            }
+#endif
         }
         .tint(themeTint)
         .environment(\.repThemeSettings, themeSettings)
@@ -159,19 +195,30 @@ private struct AppRootView: View {
             await bootstrapLocalStore()
             generateDevelopmentSampleDataIfRequested()
             restoreActiveWorkoutIfNeeded()
-            warmExercisePickerCache()
             prewarmMainScreenData()
+            // Warm index + decode leading picker thumbs during splash so Add Exercise is instant.
+            async let pickerWarm: Void = warmExercisePickerCache()
             _ = await minimumSplash
+            await pickerWarm
             withAnimation(.easeOut(duration: 0.35)) {
                 isPreparingApp = false
             }
+            scheduleIdleThumbnailWarmIfPossible()
 #if DEBUG
             startDevelopmentRestTimerIfRequested()
+            presentWorkoutCompletionScreenshotIfRequested()
 #endif
             AppLog.breadcrumb("Tab selected: \(selectedTab.title)")
         }
         .onChange(of: selectedTab) { _, tab in
             AppLog.breadcrumb("Tab selected: \(tab.title)")
+        }
+        .onChange(of: presentedWorkout?.id) { _, workoutID in
+            if workoutID == nil {
+                scheduleIdleThumbnailWarmIfPossible()
+            } else {
+                ExercisePickerSessionCache.cancelIdleThumbnailPrefetch()
+            }
         }
         .alert("Rep couldn’t prepare local data", isPresented: Binding(
             get: { startupError != nil },
@@ -211,14 +258,27 @@ private struct AppRootView: View {
         return RepThemeSettings(settings: settings)
     }
 
+    private var restTimerBottomReserve: CGFloat {
+        guard restTimerBridge.presentedTimer?.isPresented == true else { return 0 }
+        return RepVisualSystem.restTimerBannerReservedHeight
+    }
+
+    private var pageBottomReserve: CGFloat {
+        guard !hidesBottomChrome else { return 0 }
+        return RepVisualSystem.mainTabBarReservedHeight + restTimerBottomReserve
+    }
+
     private func selectTab(_ tab: AppTab) {
+        ExercisePickerSessionCache.cancelIdleThumbnailPrefetch()
         withTransaction(Transaction(animation: nil)) {
             pageDragOffset = 0
             selectedTab = tab
         }
+        scheduleIdleThumbnailWarmIfPossible()
     }
 
     private func present(_ session: WorkoutSession) {
+        ExercisePickerSessionCache.cancelIdleThumbnailPrefetch()
         if presentedWorkout?.id != session.id {
             withTransaction(Transaction(animation: nil)) {
                 presentedWorkout = session
@@ -293,6 +353,61 @@ private struct AppRootView: View {
             RestTimerDevTools.startScreenshotTimer(hapticsEnabled: haptics)
         }
     }
+
+    private func presentWorkoutCompletionScreenshotIfRequested() {
+        guard ProcessInfo.processInfo.arguments.contains("-RepShowWorkoutCompletion") else { return }
+        do {
+            presentedWorkout = nil
+            if let active = try WorkoutService(context: modelContext).activeSession() {
+                try WorkoutService(context: modelContext).abandon(active)
+            }
+
+            let names = [
+                "Barbell Bench Press",
+                "Barbell Row",
+                "Back Squat",
+                "Pull-Up",
+                "Dumbbell Curl",
+                "Romanian Deadlift"
+            ]
+            let catalog = try modelContext.fetch(FetchDescriptor<Exercise>())
+            let byName = Dictionary(uniqueKeysWithValues: catalog.map { ($0.normalizedName, $0) })
+            let startedAt = Date().addingTimeInterval(-55 * 60)
+
+            var items: [WorkoutExercise] = []
+            for (index, name) in names.enumerated() {
+                guard let exercise = byName[ExerciseNameNormalizer.normalize(name)] else { continue }
+                let sets = (0..<3).map { setIndex in
+                    let usesWeight = exercise.measurementType != .bodyweightAndRepetitions
+                    return WorkoutSet(
+                        orderIndex: setIndex,
+                        weight: usesWeight ? 40 + Double(index * 5 + setIndex * 2) : nil,
+                        repetitions: 8 + setIndex,
+                        isCompleted: true,
+                        completedAt: startedAt.addingTimeInterval(
+                            TimeInterval((index * 8 + setIndex * 2) * 60)
+                        )
+                    )
+                }
+                items.append(WorkoutExercise(exercise: exercise, orderIndex: index, sets: sets))
+            }
+            guard items.count >= 5 else { return }
+
+            let session = WorkoutSession(
+                name: "Full Body",
+                startedAt: startedAt,
+                completedAt: .now,
+                state: .completed,
+                notes: "[Rep completion screenshot]",
+                exercises: items
+            )
+            modelContext.insert(session)
+            try modelContext.save()
+            screenshotCompletionSession = session
+        } catch {
+            AppLog.persistenceFailure(operation: "Present completion screenshot", error: error)
+        }
+    }
 #endif
 
     private func bootstrapLocalStore() async {
@@ -336,16 +451,32 @@ private struct AppRootView: View {
         }
     }
 
-    private func warmExercisePickerCache() {
+    private func warmExercisePickerCache() async {
         let exercises = (try? modelContext.fetch(FetchDescriptor<Exercise>()))?
             .filter { !$0.isArchived } ?? []
-        ExercisePickerSessionCache.scheduleWarm(exercises: exercises, in: modelContext)
+        guard !exercises.isEmpty else { return }
+        await ExercisePickerSessionCache.warmAndPrefetchLeading(
+            exercises: exercises,
+            in: modelContext,
+            count: 12
+        )
     }
 
     private func prewarmMainScreenData() {
         _ = try? modelContext.fetch(FetchDescriptor<Routine>())
         _ = try? modelContext.fetch(FetchDescriptor<WorkoutSession>())
         _ = try? modelContext.fetch(FetchDescriptor<BodyweightEntry>())
+    }
+
+    private func scheduleIdleThumbnailWarmIfPossible() {
+        guard !isPreparingApp, presentedWorkout == nil else {
+            ExercisePickerSessionCache.cancelIdleThumbnailPrefetch()
+            return
+        }
+        ExercisePickerSessionCache.scheduleIdleThumbnailPrefetch(
+            count: 16,
+            thumbnailSize: ExerciseThumbnailSizing.pickerPointSize
+        )
     }
 
     private func mainScreenPager(width: CGFloat) -> some Gesture {
@@ -355,6 +486,7 @@ private struct AppRootView: View {
                 let horizontal = value.translation.width
                 let vertical = value.translation.height
                 guard abs(horizontal) > abs(vertical) * 1.15 else { return }
+                ExercisePickerSessionCache.cancelIdleThumbnailPrefetch()
 
                 let selectedIndex = selectedTab.rawValue
                 let lastIndex = AppTab.allCases.count - 1
@@ -405,6 +537,7 @@ private struct AppRootView: View {
             selectedTab = destination
             pageDragOffset = 0
         }
+        scheduleIdleThumbnailWarmIfPossible()
     }
 }
 
@@ -413,11 +546,12 @@ private extension View {
         _ tab: AppTab,
         selection: AppTab,
         width: CGFloat,
-        dragOffset: CGFloat
+        dragOffset: CGFloat,
+        bottomReservedHeight: CGFloat = RepVisualSystem.mainTabBarReservedHeight
     ) -> some View {
-        // Clear inset so UIKit-backed List/Form content can scroll above the overlay tab bar.
+        // Clear inset so content can scroll above overlay chrome (tab bar / rest banner).
         safeAreaInset(edge: .bottom, spacing: 0) {
-            Color.clear.frame(height: RepVisualSystem.mainTabBarReservedHeight)
+            Color.clear.frame(height: max(0, bottomReservedHeight))
         }
         .offset(x: CGFloat(tab.rawValue - selection.rawValue) * width + dragOffset)
         .allowsHitTesting(selection == tab)

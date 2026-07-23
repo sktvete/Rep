@@ -133,11 +133,23 @@ struct TodayView: View {
     }
 
     private func startEmptyWorkout() {
-        do {
-            let session = try WorkoutService(context: modelContext).startEmptyWorkout(name: "Workout")
-            onOpenWorkout(session)
-        } catch {
-            operationError = error.localizedDescription
+        Task { @MainActor in
+            do {
+                let exercises = (try? modelContext.fetch(FetchDescriptor<Exercise>()))?
+                    .filter { !$0.isArchived } ?? []
+                if !exercises.isEmpty {
+                    // Guarantee ≥10 picker thumbs are decoded before the empty list appears.
+                    await ExercisePickerSessionCache.warmAndPrefetchLeading(
+                        exercises: exercises,
+                        in: modelContext,
+                        count: 12
+                    )
+                }
+                let session = try WorkoutService(context: modelContext).startEmptyWorkout(name: "Workout")
+                onOpenWorkout(session)
+            } catch {
+                operationError = error.localizedDescription
+            }
         }
     }
 
@@ -285,6 +297,7 @@ private struct StartWorkoutCard: View {
                     Button(action: onChooseRoutine) {
                         Label("Choose Routine", systemImage: "list.bullet.rectangle")
                             .frame(maxWidth: .infinity)
+                            .frame(minHeight: 50)
                             .font(.headline)
                     }
                     .repPrimaryButton()
@@ -293,9 +306,11 @@ private struct StartWorkoutCard: View {
                     Button(action: onStartEmpty) {
                         Label("Start Empty Workout", systemImage: "plus")
                             .frame(maxWidth: .infinity)
+                            .frame(minHeight: 50)
+                            .font(.headline)
                     }
                     .repSecondaryButton()
-                    .controlSize(.regular)
+                    .controlSize(.large)
                 } else {
                     Button(action: onStartEmpty) {
                         Label("Start Empty Workout", systemImage: "play.fill")

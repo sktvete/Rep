@@ -8,6 +8,8 @@ struct RoutineEditorView: View {
 
     @State private var isChoosingExercise = false
     @State private var itemBeingConfigured: RoutineExercise?
+    @State private var exercisePendingRemoval: RoutineExercise?
+    @State private var exerciseOrderIDs: [UUID]
     @State private var routinePendingDeletion = false
     @State private var operationError: String?
     @State private var debouncedSaveTask: Task<Void, Never>?
@@ -17,10 +19,27 @@ struct RoutineEditorView: View {
     init(routine: Routine, onStartRoutine: @escaping () -> Void = {}) {
         self.routine = routine
         self.onStartRoutine = onStartRoutine
+        _exerciseOrderIDs = State(
+            initialValue: routine.exercises.sorted { $0.orderIndex < $1.orderIndex }.map(\.id)
+        )
+    }
+
+    private var persistedOrderedExercises: [RoutineExercise] {
+        routine.exercises.sorted { $0.orderIndex < $1.orderIndex }
     }
 
     private var orderedExercises: [RoutineExercise] {
-        routine.exercises.sorted { $0.orderIndex < $1.orderIndex }
+        let byID = Dictionary(uniqueKeysWithValues: routine.exercises.map { ($0.id, $0) })
+        let arranged = exerciseOrderIDs.compactMap { byID[$0] }
+        let arrangedIDs = Set(arranged.map(\.id))
+        return arranged + persistedOrderedExercises.filter { !arrangedIDs.contains($0.id) }
+    }
+
+    private var reorderExerciseBinding: Binding<[RoutineExercise]> {
+        Binding(
+            get: { orderedExercises },
+            set: { exerciseOrderIDs = $0.map(\.id) }
+        )
     }
 
     var body: some View {
@@ -69,18 +88,44 @@ struct RoutineEditorView: View {
             }
 
             Section {
-                ForEach(Array(orderedExercises.enumerated()), id: \.element.id) { index, item in
-                    Button {
-                        itemBeingConfigured = item
-                    } label: {
-                        RoutineExerciseRow(item: item, listIndex: index)
+                if !orderedExercises.isEmpty {
+                    RepLiveReorderStack(
+                        items: reorderExerciseBinding,
+                        id: \.id,
+                        axis: .vertical,
+                        spacing: 8,
+                        onInteraction: { ExerciseThumbnailIdlePreloader.shared.cancel() },
+                        onStationaryHold: { exerciseID in
+                            exercisePendingRemoval = orderedExercises.first { $0.id == exerciseID }
+                        },
+                        onCommit: commitExerciseOrder
+                    ) { item, _ in
+                        let index = orderedExercises.firstIndex { $0.id == item.id }
+                        Button {
+                            itemBeingConfigured = item
+                        } label: {
+                            HStack(spacing: 10) {
+                                RoutineExerciseRow(item: item, listIndex: index)
+                                Image(systemName: "line.3.horizontal")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.tertiary)
+                                    .accessibilityHidden(true)
+                            }
+                            .padding(12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .repSurface(cornerRadius: 14, shadowRadius: 3, shadowY: 1)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint("Tap for set and rest settings. Hold and move to reorder; keep holding to remove")
+                        .accessibilityAction(named: "Remove exercise") {
+                            exercisePendingRemoval = item
+                        }
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityHint("Opens set, repetition, and rest settings")
-                    .repThemedListRow()
+                    .padding(.vertical, 8)
+                    .listRowInsets(RepThemedList.rowInsets)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
                 }
-                .onDelete(perform: removeExercises)
-                .onMove(perform: moveExercises)
 
                 Button {
                     isChoosingExercise = true
@@ -91,20 +136,12 @@ struct RoutineEditorView: View {
                 .foregroundStyle(routine.colorPreset.color)
                 .repThemedListRow()
             } header: {
-                HStack {
-                    RepSectionHeader(title: "Exercises")
-                    Spacer()
-                    if orderedExercises.count > 1 {
-                        EditButton()
-                            .font(.caption)
-                            .textCase(nil)
-                    }
-                }
+                RepSectionHeader(title: "Exercises")
             } footer: {
                 Text(
                     orderedExercises.isEmpty
                         ? "Add the movements for this routine. You can tune sets and rest on each exercise."
-                        : "Drag while editing to match the order you normally train."
+                        : "Hold an exercise, then move it to reorder. Keep holding to remove it."
                 )
             }
 
@@ -116,6 +153,7 @@ struct RoutineEditorView: View {
             }
         }
         .repThemedList()
+        .scrollClipDisabled()
         // Start bar + tab-bar spacer already reserve the bottom via safeAreaInset.
         .contentMargins(.bottom, 8, for: .scrollContent)
         .background(RepScreenBackground())
@@ -128,9 +166,17 @@ struct RoutineEditorView: View {
         .navigationTitle(routine.name.isEmpty ? "Routine" : routine.name)
         .navigationBarTitleDisplayMode(.inline)
         .tint(routine.colorPreset.color)
+        .onAppear {
+            ExerciseThumbnailIdlePreloader.shared.cancel()
+            reconcileExerciseOrder()
+        }
+        .onChange(of: routine.exercises.map(\.id)) { _, _ in
+            reconcileExerciseOrder()
+        }
         .onDisappear {
             debouncedSaveTask?.cancel()
             keepChanges()
+            ExercisePickerSessionCache.scheduleIdleThumbnailPrefetch()
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if !routine.isArchived {
@@ -163,6 +209,22 @@ struct RoutineEditorView: View {
         }
         .sheet(item: $itemBeingConfigured) { item in
             RoutineExerciseConfigurationView(item: item, onPersist: keepChanges)
+        }
+        .confirmationDialog(
+            "Remove this exercise?",
+            isPresented: Binding(
+                get: { exercisePendingRemoval != nil },
+                set: { if !$0 { exercisePendingRemoval = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Remove exercise", role: .destructive) {
+                if let exercisePendingRemoval {
+                    removeExercise(exercisePendingRemoval)
+                }
+                exercisePendingRemoval = nil
+            }
+            Button("Cancel", role: .cancel) { exercisePendingRemoval = nil }
         }
         .alert("Delete routine?", isPresented: $routinePendingDeletion) {
             Button("Delete", role: .destructive) {
@@ -197,22 +259,21 @@ struct RoutineEditorView: View {
             defaultRestSeconds: 90
         )
         routine.appendExercise(item)
+        exerciseOrderIDs.append(item.id)
         keepChanges()
     }
 
-    private func removeExercises(at offsets: IndexSet) {
+    private func removeExercise(_ item: RoutineExercise) {
         var items = orderedExercises
-        for index in offsets.sorted(by: >) {
-            let item = items.remove(at: index)
-            routine.exercises.removeAll { $0.id == item.id }
-            modelContext.delete(item)
-        }
+        items.removeAll { $0.id == item.id }
+        routine.exercises.removeAll { $0.id == item.id }
+        exerciseOrderIDs.removeAll { $0 == item.id }
+        modelContext.delete(item)
         updateOrder(of: items)
     }
 
-    private func moveExercises(from offsets: IndexSet, to destination: Int) {
-        var items = orderedExercises
-        items.move(fromOffsets: offsets, toOffset: destination)
+    private func commitExerciseOrder(_ items: [RoutineExercise]) {
+        guard items.map(\.id) != persistedOrderedExercises.map(\.id) else { return }
         updateOrder(of: items)
     }
 
@@ -220,8 +281,18 @@ struct RoutineEditorView: View {
         for (index, item) in items.enumerated() {
             item.orderIndex = index
         }
+        exerciseOrderIDs = items.map(\.id)
         routine.updatedAt = .now
         keepChanges()
+    }
+
+    private func reconcileExerciseOrder() {
+        let modelIDs = Set(routine.exercises.map(\.id))
+        let retained = exerciseOrderIDs.filter { modelIDs.contains($0) }
+        let retainedIDs = Set(retained)
+        exerciseOrderIDs = retained + persistedOrderedExercises.map(\.id).filter {
+            !retainedIDs.contains($0)
+        }
     }
 
     private func scheduleKeepChanges() {

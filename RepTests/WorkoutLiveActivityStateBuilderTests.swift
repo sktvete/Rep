@@ -82,6 +82,69 @@ struct WorkoutLiveActivityStateBuilderTests {
         )
     }
 
+    @Test("Another on the last set appends a cloned set for the same exercise")
+    @MainActor
+    func anotherOnLastSetAppendsSet() {
+        let only = WorkoutSet(orderIndex: 0, weight: 60, repetitions: 10, isCompleted: true)
+        let row = workoutExercise(name: "Row", orderIndex: 0, sets: [only])
+        let session = WorkoutSession(name: "Pull", exercises: [row])
+        let target = WorkoutLiveActivityStateBuilder.Target(exercise: row, set: only)
+
+        let focus = WorkoutLiveActivityStateBuilder.focusAfterCompleting(
+            target,
+            preferSameExercise: true,
+            in: session
+        )
+
+        #expect(row.sets.count == 2)
+        #expect(focus.exercise.id == row.id)
+        #expect(focus.set.id != only.id)
+        #expect(focus.set.isCompleted == false)
+        #expect(focus.set.weight == 60)
+        #expect(focus.set.repetitions == 10)
+        #expect(focus.set.orderIndex == 1)
+    }
+
+    @Test("Next with no later exercise appends a set on the current exercise")
+    @MainActor
+    func nextOnLastExerciseAppendsSet() {
+        let only = WorkoutSet(orderIndex: 0, weight: 60, repetitions: 10, isCompleted: true)
+        let row = workoutExercise(name: "Row", orderIndex: 0, sets: [only])
+        let session = WorkoutSession(name: "Pull", exercises: [row])
+        let target = WorkoutLiveActivityStateBuilder.Target(exercise: row, set: only)
+
+        let focus = WorkoutLiveActivityStateBuilder.focusAfterCompleting(
+            target,
+            preferSameExercise: false,
+            in: session
+        )
+
+        #expect(row.sets.count == 2)
+        #expect(focus.set.id != only.id)
+        #expect(focus.set.isCompleted == false)
+    }
+
+    @Test("Next advances to the next exercise when one remains")
+    @MainActor
+    func nextAdvancesToFollowingExercise() {
+        let done = WorkoutSet(orderIndex: 0, weight: 60, repetitions: 10, isCompleted: true)
+        let row = workoutExercise(name: "Row", orderIndex: 0, sets: [done])
+        let curlSet = WorkoutSet(orderIndex: 0)
+        let curl = workoutExercise(name: "Curl", orderIndex: 1, sets: [curlSet])
+        let session = WorkoutSession(name: "Pull", exercises: [row, curl])
+        let target = WorkoutLiveActivityStateBuilder.Target(exercise: row, set: done)
+
+        let focus = WorkoutLiveActivityStateBuilder.focusAfterCompleting(
+            target,
+            preferSameExercise: false,
+            in: session
+        )
+
+        #expect(focus.exercise.id == curl.id)
+        #expect(focus.set.id == curlSet.id)
+        #expect(row.sets.count == 1)
+    }
+
     @Test("Empty next-set fields inherit the completed set values")
     @MainActor
     func prefillEmptyValuesFromCompletedSet() {
@@ -142,6 +205,7 @@ struct WorkoutLiveActivityStateBuilderTests {
     func weightStepsByEquipment() {
         #expect(ExerciseWeightStep.kilogramsStep(for: exercise(muscle: .back, equipment: .machine)) == 5)
         #expect(ExerciseWeightStep.kilogramsStep(for: exercise(muscle: .back, equipment: .cable)) == 2.5)
+        #expect(ExerciseWeightStep.kilogramsStep(for: exercise(muscle: .triceps, equipment: .cable)) == 2.5)
         #expect(ExerciseWeightStep.kilogramsStep(for: exercise(muscle: .chest, equipment: .dumbbell)) == 2.5)
         #expect(ExerciseWeightStep.kilogramsStep(for: exercise(muscle: .chest, equipment: .barbell)) == 5)
         #expect(ExerciseWeightStep.kilogramsStep(for: exercise(muscle: .back, equipment: .barbell)) == 5)

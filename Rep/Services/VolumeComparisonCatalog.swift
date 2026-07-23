@@ -85,10 +85,10 @@ enum VolumeComparisonCatalog {
         .init(singular: "adult manatee", plural: "adult manatees", kilograms: 500, surprising: true)
     ]
 
-    /// Builds a long list of exact-volume comparisons, mixing practical and wild ones.
+    /// One impressive (practical) comparison and one fun (surprising) comparison.
     static func comparisons(
         forKilograms volumeKilograms: Double,
-        limit: Int = 18
+        limit: Int = 2
     ) -> [VolumeComparison] {
         guard volumeKilograms > 0 else { return [] }
 
@@ -97,74 +97,85 @@ enum VolumeComparisonCatalog {
             guard count >= 0.08, count <= 2_000_000 else { return nil }
             return (reference, count, interestScore(count: count, surprising: reference.surprising))
         }
-        .sorted { $0.2 > $1.2 }
 
-        var ordinary: [VolumeComparison] = []
-        var surprising: [VolumeComparison] = []
+        let impressive = candidates
+            .filter { !$0.0.surprising }
+            .max(by: { $0.2 < $1.2 })
+        let fun = candidates
+            .filter(\.0.surprising)
+            .max(by: { $0.2 < $1.2 })
 
-        for (reference, count, _) in candidates {
-            let item = VolumeComparison(
-                label: formattedCount(count),
-                detail: noun(for: reference, count: count),
-                count: count,
-                isSurprising: reference.surprising
-            )
-            if reference.surprising {
-                surprising.append(item)
-            } else {
-                ordinary.append(item)
-            }
-        }
-
-        // Interleave ordinary + wild so the list feels rich, not one-note.
         var picked: [VolumeComparison] = []
-        var ordinaryIndex = 0
-        var surprisingIndex = 0
-        while picked.count < limit,
-              ordinaryIndex < ordinary.count || surprisingIndex < surprising.count {
-            if ordinaryIndex < ordinary.count {
-                picked.append(ordinary[ordinaryIndex])
-                ordinaryIndex += 1
-            }
-            guard picked.count < limit else { break }
-            if surprisingIndex < surprising.count {
-                picked.append(surprising[surprisingIndex])
-                surprisingIndex += 1
-            }
+        if let impressive {
+            picked.append(makeComparison(reference: impressive.0, count: impressive.1))
+        }
+        if let fun {
+            picked.append(makeComparison(reference: fun.0, count: fun.1))
         }
 
-        return picked
+        // Fallback if one bucket is empty for an unusual volume.
+        if picked.count < min(limit, 2) {
+            let extras = candidates
+                .sorted { $0.2 > $1.2 }
+                .map { makeComparison(reference: $0.0, count: $0.1) }
+                .filter { candidate in !picked.contains(where: { $0.id == candidate.id }) }
+            picked.append(contentsOf: extras.prefix(min(limit, 2) - picked.count))
+        }
+
+        return Array(picked.prefix(limit))
+    }
+
+    private static func makeComparison(reference: Reference, count: Double) -> VolumeComparison {
+        VolumeComparison(
+            label: formattedCount(count),
+            detail: noun(for: reference, count: count),
+            count: count,
+            isSurprising: reference.surprising
+        )
     }
 
     private static func interestScore(count: Double, surprising: Bool) -> Double {
         let fractional = abs(count - count.rounded())
-        let nearWhole = 1.0 - min(1.0, fractional * 2.2)
+        // Strongly prefer whole (or nearly whole) counts over 3,05-style decimals.
+        let wholeBonus: Double
+        switch fractional {
+        case 0..<0.03: wholeBonus = 3.0
+        case 0.03..<0.08: wholeBonus = 2.2
+        case 0.08..<0.15: wholeBonus = 1.0
+        default: wholeBonus = 0.15
+        }
+        // Prefer chunky, memorable amounts — a few cars beats 847 bricks.
         let magnitudeBonus: Double
         switch count {
-        case 0.15..<1: magnitudeBonus = 0.9
-        case 1..<3: magnitudeBonus = 1.2
-        case 3..<25: magnitudeBonus = 1.3
-        case 25..<120: magnitudeBonus = 1.1
-        case 120..<2_000: magnitudeBonus = 0.95
-        default: magnitudeBonus = 0.75
+        case 0.5..<1.5: magnitudeBonus = 1.35
+        case 1.5..<6: magnitudeBonus = 1.4
+        case 6..<20: magnitudeBonus = 1.15
+        case 20..<80: magnitudeBonus = 0.95
+        case 0.15..<0.5: magnitudeBonus = 1.05
+        default: magnitudeBonus = 0.7
         }
-        return nearWhole * 1.5 + magnitudeBonus + (surprising ? 0.25 : 0.15)
+        let heftBonus = surprising ? 0.2 : min(0.35, log10(max(1, count * 10)) * 0.08)
+        return wholeBonus + magnitudeBonus + heftBonus
     }
 
     private static func formattedCount(_ count: Double) -> String {
+        let nearest = count.rounded()
+        // Snap to a whole number whenever we're close enough to read cleanly.
+        if abs(count - nearest) < 0.12, nearest >= 1 {
+            return Int(nearest).formatted()
+        }
         if count >= 100 {
             return count.formatted(.number.precision(.fractionLength(0)))
         }
         if count >= 10 {
-            return count.formatted(.number.precision(.fractionLength(0...1)))
+            return count.formatted(.number.precision(.fractionLength(0)))
         }
-        if abs(count - count.rounded()) < 0.03 {
-            return Int(count.rounded()).formatted()
-        }
-        return count.formatted(.number.precision(.fractionLength(1...2)))
+        // One decimal max — never "3,05".
+        return count.formatted(.number.precision(.fractionLength(0...1)))
     }
 
     private static func noun(for reference: Reference, count: Double) -> String {
-        abs(count - 1) < 0.03 ? reference.singular : reference.plural
+        let display = abs(count - count.rounded()) < 0.12 ? count.rounded() : count
+        return abs(display - 1) < 0.03 ? reference.singular : reference.plural
     }
 }

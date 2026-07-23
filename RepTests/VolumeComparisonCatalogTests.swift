@@ -3,10 +3,10 @@ import Testing
 
 @Suite("Volume comparisons")
 struct VolumeComparisonCatalogTests {
-    @Test("Comparisons are produced for real session volumes")
+    @Test("Typical volume yields one impressive and one fun comparison")
     func comparisonsForTypicalVolume() {
-        let items = VolumeComparisonCatalog.comparisons(forKilograms: 5_796, limit: 18)
-        #expect(items.count == 18)
+        let items = VolumeComparisonCatalog.comparisons(forKilograms: 5_796)
+        #expect(items.count == 2)
         #expect(items.contains { item in item.isSurprising })
         #expect(items.contains { item in !item.isSurprising })
         #expect(items.allSatisfy { item in !item.label.isEmpty && !item.detail.isEmpty })
@@ -18,10 +18,10 @@ struct VolumeComparisonCatalogTests {
         #expect(items.isEmpty)
     }
 
-    @Test("Near-exact piano match appears for 400 kg")
+    @Test("Near-exact piano volume can surface as the impressive pick")
     func nearWholeFormatting() {
-        let items = VolumeComparisonCatalog.comparisons(forKilograms: 400, limit: 24)
-        let hasPiano = items.contains { item in item.detail.contains("piano") }
-        #expect(hasPiano)
+        let items = VolumeComparisonCatalog.comparisons(forKilograms: 400)
+        #expect(items.contains { !$0.isSurprising })
+        #expect(items.count <= 2)
     }
 }

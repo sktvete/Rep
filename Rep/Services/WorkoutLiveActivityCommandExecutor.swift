@@ -139,6 +139,9 @@ enum WorkoutLiveActivityWorkoutCoordinator {
 @MainActor
 enum WorkoutLiveActivityCommandExecutor {
     static func execute(_ command: WorkoutLiveActivityCommand) async throws {
+        await MainActor.run {
+            LockScreenInteractionKeepAwake.ping()
+        }
         switch command {
         case let .toggleRestPause(sessionID):
             guard let sessionID = UUID(uuidString: sessionID) else { return }
@@ -164,22 +167,37 @@ enum WorkoutLiveActivityCommandExecutor {
             return
 
         case let .adjustWeight(sessionID, setID, delta):
+            // Lock Screen first, then persist — intents feel snappy that way.
+            if let sessionUUID = UUID(uuidString: sessionID) {
+                await RestTimerLiveActivityManager.applyWeightDeltaFromIntent(
+                    sessionID: sessionUUID,
+                    setID: setID,
+                    delta: delta
+                )
+            }
             try await mutateSet(sessionID: sessionID, setID: setID) { target, session, preferredUnit, context in
                 guard !target.set.isCompleted else { return }
                 adjustWeight(of: target, by: delta, preferredUnit: preferredUnit)
                 session.updatedAt = .now
-                await synchronize(target: target, session: session, preferredUnit: preferredUnit)
+                // Skip a second ActivityKit round-trip — optimistic paint already ran.
                 try context.save()
             }
 
         case let .adjustRepetitions(sessionID, setID, delta):
+            // Lock Screen first, then persist — intents feel snappy that way.
+            if let sessionUUID = UUID(uuidString: sessionID) {
+                await RestTimerLiveActivityManager.applyRepetitionsDeltaFromIntent(
+                    sessionID: sessionUUID,
+                    setID: setID,
+                    delta: delta
+                )
+            }
             try await mutateSet(sessionID: sessionID, setID: setID) { target, session, preferredUnit, context in
                 guard !target.set.isCompleted else { return }
                 let adjusted = max(0, (target.set.repetitions ?? 0) + delta)
                 target.set.repetitions = adjusted == 0 ? nil : adjusted
                 target.set.updatedAt = .now
                 session.updatedAt = .now
-                await synchronize(target: target, session: session, preferredUnit: preferredUnit)
                 try context.save()
             }
 
@@ -241,7 +259,7 @@ enum WorkoutLiveActivityCommandExecutor {
     private static func complete(
         sessionID: String,
         setID: String,
-        preferSameExercise _: Bool
+        preferSameExercise: Bool
     ) async throws {
         guard let sessionUUID = UUID(uuidString: sessionID),
               let setUUID = UUID(uuidString: setID) else { return }
@@ -272,46 +290,54 @@ enum WorkoutLiveActivityCommandExecutor {
             session.updatedAt = .now
         }
 
-        // Always stay on the current exercise; never auto-advance to the next one.
-        let nextTarget = WorkoutLiveActivityStateBuilder.nextTargetOnSameExercise(after: target)
-        let focus = nextTarget ?? target
-        if let nextTarget {
-            WorkoutLiveActivityStateBuilder.prefillEmptyValues(
-                on: nextTarget.set,
-                from: target.set
-            )
-        }
+        // Another: stay on exercise and append when needed.
+        // Next: advance to next incomplete target, or append when nothing remains.
+        let focus = WorkoutLiveActivityStateBuilder.focusAfterCompleting(
+            target,
+            preferSameExercise: preferSameExercise,
+            in: session
+        )
         session.updatedAt = .now
 
-        // Lock Screen first, then persist — intents feel snappy that way.
         WorkoutLiveActivityWorkoutCoordinator.selectExercise(
-            target.exercise.id,
+            focus.exercise.id,
             sessionID: sessionUUID
-        )
-        await synchronize(
-            target: focus,
-            session: session,
-            preferredUnit: preferredUnit
         )
 
         let restSeconds = target.exercise.defaultRestSeconds
             ?? settings?.defaultRestSeconds
             ?? 90
-        let nextLabel = nextTarget.map(WorkoutLiveActivityStateBuilder.targetLabel)
-            ?? WorkoutLiveActivityStateBuilder.followingLabel(after: target, in: session)
+        let nextLabel = WorkoutLiveActivityStateBuilder.targetLabel(focus)
+        let snapshot = WorkoutLiveActivityStateBuilder.snapshot(
+            focus,
+            preferredUnit: preferredUnit
+        )
+        let inAppTimer = ActiveWorkoutRestTimerBridge.shared.presentedTimer
+        let liveActivityRestSeconds = inAppTimer == nil ? restSeconds : 0
 
-        if let timer = ActiveWorkoutRestTimerBridge.shared.presentedTimer {
-            timer.start(seconds: restSeconds, nextExerciseName: nextLabel)
-        } else if let endDate = await RestTimerLiveActivityManager.startRestFromIntent(
+        // One ActivityKit update paints the next set + Logged (+ rest when app isn't open).
+        await RestTimerLiveActivityManager.applyCompletedSetFromIntent(
             sessionID: sessionUUID,
-            seconds: restSeconds,
-            nextExerciseName: nextLabel
-        ) {
-            RestTimerNotificationManager.schedule(sessionID: sessionUUID, at: endDate)
-        }
+            currentSet: snapshot,
+            nextExerciseName: WorkoutLiveActivityStateBuilder.followingLabel(
+                after: focus,
+                in: session
+            ),
+            restSeconds: liveActivityRestSeconds,
+            restNextExerciseName: nextLabel
+        )
 
-        RestTimerLiveActivityManager.announceSetLogged(sessionID: sessionUUID)
+        // Persist after Lock Screen paint so the intent returns quickly.
         try context.save()
+
+        if let timer = inAppTimer {
+            timer.start(seconds: restSeconds, nextExerciseName: nextLabel)
+        } else if restSeconds > 0 {
+            RestTimerNotificationManager.schedule(
+                sessionID: sessionUUID,
+                at: Date().addingTimeInterval(TimeInterval(restSeconds))
+            )
+        }
     }
 
     private static func adjustWeight(
@@ -345,24 +371,6 @@ enum WorkoutLiveActivityCommandExecutor {
             target.set.assistanceWeight = adjustedKilograms
         }
         target.set.updatedAt = .now
-    }
-
-    private static func synchronize(
-        target: WorkoutLiveActivityStateBuilder.Target,
-        session: WorkoutSession,
-        preferredUnit: WeightUnit
-    ) async {
-        await RestTimerLiveActivityManager.syncWorkoutImmediately(
-            sessionID: session.id,
-            currentSet: WorkoutLiveActivityStateBuilder.snapshot(
-                target,
-                preferredUnit: preferredUnit
-            ),
-            nextExerciseName: WorkoutLiveActivityStateBuilder.followingLabel(
-                after: target,
-                in: session
-            )
-        )
     }
 }
 
@@ -426,6 +434,35 @@ enum WorkoutLiveActivityStateBuilder {
             return Target(exercise: target.exercise, set: set)
         }
         return nil
+    }
+
+    /// After logging a set:
+    /// - Prefer the next incomplete set on the same exercise.
+    /// - “Another” always appends when none remain on this exercise.
+    /// - “Next” advances to a later exercise when one exists; otherwise appends.
+    static func focusAfterCompleting(
+        _ target: Target,
+        preferSameExercise: Bool,
+        in session: WorkoutSession
+    ) -> Target {
+        if let next = nextTargetOnSameExercise(after: target) {
+            prefillEmptyValues(on: next.set, from: target.set)
+            return next
+        }
+        if preferSameExercise {
+            return appendExtraSet(after: target)
+        }
+        if let across = nextTarget(after: target, in: session) {
+            return across
+        }
+        return appendExtraSet(after: target)
+    }
+
+    private static func appendExtraSet(after target: Target) -> Target {
+        let newSet = WorkoutCreationService().makeExtraSet(for: target.exercise)
+        target.exercise.sets.append(newSet)
+        target.exercise.normalizeSetOrder()
+        return Target(exercise: target.exercise, set: newSet)
     }
 
     /// Copies performance fields onto `next` only when that field is empty, so a

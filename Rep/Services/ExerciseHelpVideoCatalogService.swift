@@ -175,4 +175,10 @@ struct ExerciseHelpVideoCatalog: Equatable, Sendable {
         guard isValidYouTubeVideoID(videoID) else { return nil }
         return URL(string: "https://www.youtube.com/watch?v=\(videoID)")
     }
+
+    static func thumbnailURL(forVideoID videoID: String) -> URL? {
+        let trimmed = videoID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard isValidYouTubeVideoID(trimmed) else { return nil }
+        return URL(string: "https://i.ytimg.com/vi/\(trimmed)/hqdefault.jpg")
+    }
 }

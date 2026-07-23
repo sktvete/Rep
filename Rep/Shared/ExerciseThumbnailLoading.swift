@@ -120,45 +120,198 @@ final class ExerciseThumbnailListTracker {
     fileprivate static var registeredPrefetchSources: [UUID: () -> [(index: Int, url: URL, maxPixel: CGFloat)]] = [:]
 }
 
+enum ExerciseThumbnailSizing {
+    /// Point size used by exercise picker / add-exercise rows.
+    static let pickerPointSize: CGFloat = 44
+
+    /// Decode size shared by prefetch + on-screen picker rows so NSCache keys match.
+    /// Cap at 64px — research shows list hitch is dominated by ImageIO decode cost;
+    /// 44pt @2x is 88 but the 64 bucket is enough for this UI and halves pixel fill.
+    @MainActor
+    static var pickerMaxPixel: CGFloat {
+        min(64, pickerPointSize * min(UIScreen.main.scale, 2))
+    }
+
+    static func canonicalPixelSize(_ requested: CGFloat) -> CGFloat {
+        let requested = max(1, requested.rounded(.up))
+        let buckets: [CGFloat] = [48, 64, 96, 128, 160, 192, 256]
+        return buckets.first(where: { $0 >= requested }) ?? buckets.last ?? requested
+    }
+
+    static func cacheKey(url: URL, maxPixel: CGFloat) -> String {
+        "\(url.absoluteString)|\(Int(canonicalPixelSize(maxPixel)))"
+    }
+}
+
+/// Process-wide decoded-thumbnail store. Thread-safe via `NSCache`, readable
+/// synchronously from SwiftUI so prefetched rows paint without an async hop.
+enum ExerciseThumbnailSyncCache {
+    // NSCache is thread-safe; marked unsafe for Swift 6 static Sendable checks.
+    nonisolated(unsafe) private static let memory: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.countLimit = 320
+        cache.totalCostLimit = 32 * 1_024 * 1_024
+        return cache
+    }()
+
+    static func store(_ image: UIImage, forKey key: String) {
+        let cost = image.cgImage.map { $0.bytesPerRow * $0.height } ?? 0
+        memory.setObject(image, forKey: key as NSString, cost: cost)
+    }
+
+    static func image(forKey key: String) -> UIImage? {
+        memory.object(forKey: key as NSString)
+    }
+
+    static func image(url: URL, maxPixel: CGFloat) -> UIImage? {
+        image(forKey: ExerciseThumbnailSizing.cacheKey(url: url, maxPixel: maxPixel))
+    }
+
+    static func clear() {
+        memory.removeAllObjects()
+    }
+}
+
 enum ExerciseThumbnailPrefetch {
     @MainActor
     static func sources(
         from exercises: [Exercise],
         thumbnailSize: CGFloat
     ) -> [(index: Int, url: URL, maxPixel: CGFloat)] {
-        let displayScale = UIScreen.main.scale
-        let maxPixel = thumbnailSize * max(1, displayScale)
-        return exercises.enumerated().compactMap { index, exercise in
-            guard let value = exercise.mediaURLString,
-                  !value.isEmpty,
-                  let url = URL(string: value)
-            else { return nil }
+        let maxPixel = thumbnailSize == ExerciseThumbnailSizing.pickerPointSize
+            ? ExerciseThumbnailSizing.pickerMaxPixel
+            : thumbnailSize * min(UIScreen.main.scale, 2)
+        return sources(from: exercises, maxPixel: maxPixel)
+    }
+
+    @MainActor
+    static func sources(
+        from exercises: [Exercise],
+        maxPixel: CGFloat
+    ) -> [(index: Int, url: URL, maxPixel: CGFloat)] {
+        exercises.enumerated().compactMap { index, exercise in
+            guard let url = ExerciseCatalogMedia.resolvedURL(for: exercise) else { return nil }
             return (index, url, maxPixel)
         }
     }
 
-    /// Loads the leading picker rows into `ExerciseThumbnailCache` so Add Exercise opens warm.
+    /// Loads the leading picker rows into ``ExerciseThumbnailCache`` and awaits completion.
     @MainActor
     static func prefetchLeading(
         from exercises: [Exercise],
-        count: Int = 10,
-        thumbnailSize: CGFloat = 58
-    ) {
+        count: Int = 12,
+        thumbnailSize: CGFloat = ExerciseThumbnailSizing.pickerPointSize
+    ) async {
         let sources = sources(
             from: Array(exercises.prefix(count)),
             thumbnailSize: thumbnailSize
         )
         guard !sources.isEmpty else { return }
 
-        Task {
+        await withTaskGroup(of: Void.self) { group in
             for item in sources {
-                guard !Task.isCancelled else { return }
+                group.addTask {
+                    _ = await ExerciseThumbnailCache.shared.thumbnail(
+                        for: item.url,
+                        maxPixelSize: item.maxPixel,
+                        priority: .onScreen(listIndex: item.index)
+                    )
+                }
+            }
+        }
+    }
+
+    /// Fire-and-forget wrapper for non-launch call sites.
+    @MainActor
+    static func prefetchLeadingInBackground(
+        from exercises: [Exercise],
+        count: Int = 12,
+        thumbnailSize: CGFloat = ExerciseThumbnailSizing.pickerPointSize
+    ) {
+        Task {
+            await prefetchLeading(
+                from: exercises,
+                count: count,
+                thumbnailSize: thumbnailSize
+            )
+        }
+    }
+}
+
+/// Debounced, cancellable thumbnail warming for moments when the app has no user work.
+///
+/// Search-index warming is intentionally separate: building the local index never starts
+/// network requests. The app can schedule this coordinator after the UI becomes idle and
+/// cancel it as soon as typing, scrolling, a workout, or another interaction begins.
+@MainActor
+final class ExerciseThumbnailIdlePreloader {
+    static let shared = ExerciseThumbnailIdlePreloader()
+
+    private var task: Task<Void, Never>?
+
+    func schedule(
+        from exercises: [Exercise],
+        count: Int = 16,
+        thumbnailSize: CGFloat = 58,
+        debounceNanoseconds: UInt64 = 250_000_000
+    ) {
+        let sources = ExerciseThumbnailPrefetch.sources(
+            from: Array(exercises.prefix(max(0, count))),
+            thumbnailSize: thumbnailSize
+        )
+        schedule(sources: sources, debounceNanoseconds: debounceNanoseconds)
+    }
+
+    func schedule(
+        sources: [(index: Int, url: URL, maxPixel: CGFloat)],
+        debounceNanoseconds: UInt64 = 250_000_000
+    ) {
+        task?.cancel()
+
+        var seen = Set<URL>()
+        let uniqueSources = sources.filter { seen.insert($0.url).inserted }
+        guard !uniqueSources.isEmpty, canPrefetch else {
+            task = nil
+            return
+        }
+
+        task = Task(priority: .utility) { [uniqueSources] in
+            do {
+                try await Task.sleep(nanoseconds: debounceNanoseconds)
+            } catch {
+                return
+            }
+
+            guard !Task.isCancelled, canPrefetch else { return }
+
+            // Deliberately sequential: idle warming must never compete with on-screen
+            // rows for network, decoding, or memory bandwidth.
+            for source in uniqueSources {
+                guard !Task.isCancelled, canPrefetch else { return }
                 _ = await ExerciseThumbnailCache.shared.thumbnail(
-                    for: item.url,
-                    maxPixelSize: item.maxPixel,
-                    priority: .prefetch(listIndex: item.index)
+                    for: source.url,
+                    maxPixelSize: source.maxPixel,
+                    priority: .prefetch(listIndex: source.index)
                 )
             }
+        }
+    }
+
+    func cancel() {
+        task?.cancel()
+        task = nil
+    }
+
+    private var canPrefetch: Bool {
+        let processInfo = ProcessInfo.processInfo
+        guard !processInfo.isLowPowerModeEnabled else { return false }
+        switch processInfo.thermalState {
+        case .serious, .critical:
+            return false
+        case .nominal, .fair:
+            return true
+        @unknown default:
+            return false
         }
     }
 }

@@ -1,7 +1,6 @@
 import SwiftData
 import SwiftUI
 import UIKit
-import UniformTypeIdentifiers
 
 enum WorkoutKeyboardDestination: CaseIterable, Hashable, Identifiable {
     case workout
@@ -48,9 +47,9 @@ struct ActiveWorkoutView: View {
     let onClose: () -> Void
 
     @State private var selectedExerciseID: UUID?
+    @State private var exerciseOrderIDs: [UUID]
     @State private var restTimer: WorkoutRestTimerViewModel
     @State private var isShowingExercisePicker = false
-    @State private var draggedExerciseID: UUID?
     @State private var detailExercise: Exercise?
     @State private var isShowingFinishConfirmation = false
     @State private var isShowingDiscardConfirmation = false
@@ -69,10 +68,25 @@ struct ActiveWorkoutView: View {
         self.onKeyboardNavigate = onKeyboardNavigate
         self.onClose = onClose
         _selectedExerciseID = State(initialValue: Self.restoredSelection(for: session))
+        _exerciseOrderIDs = State(initialValue: session.orderedExercises.map(\.id))
         _restTimer = State(initialValue: WorkoutRestTimerViewModel(sessionID: session.id))
     }
 
     private var orderedExercises: [WorkoutExercise] { session.orderedExercises }
+
+    private var navigationExercises: [WorkoutExercise] {
+        let byID = Dictionary(uniqueKeysWithValues: orderedExercises.map { ($0.id, $0) })
+        let arranged = exerciseOrderIDs.compactMap { byID[$0] }
+        let arrangedIDs = Set(arranged.map(\.id))
+        return arranged + orderedExercises.filter { !arrangedIDs.contains($0.id) }
+    }
+
+    private var navigationExerciseBinding: Binding<[WorkoutExercise]> {
+        Binding(
+            get: { navigationExercises },
+            set: { exerciseOrderIDs = $0.map(\.id) }
+        )
+    }
 
     private var currentExercise: WorkoutExercise? {
         orderedExercises.first { $0.id == selectedExerciseID } ?? orderedExercises.first
@@ -116,6 +130,7 @@ struct ActiveWorkoutView: View {
         .background(KeyboardDismissTapInstaller())
         .interactiveDismissDisabled(session.state == .active)
         .onAppear {
+            reconcileExerciseOrder(with: orderedExercises.map(\.id))
             if selectedExerciseID == nil {
                 selectedExerciseID = orderedExercises.first?.id
             }
@@ -123,6 +138,7 @@ struct ActiveWorkoutView: View {
                 exercises: availableExercises,
                 in: modelContext
             )
+            LockScreenInteractionKeepAwake.beginWorkoutHold()
             updateRestTimerHapticsPreference()
             ActiveWorkoutRestTimerBridge.shared.register(timer: restTimer) {
                 restTimer.start(seconds: 5, nextExerciseName: "Development test")
@@ -135,6 +151,8 @@ struct ActiveWorkoutView: View {
         .onDisappear {
             ActiveWorkoutRestTimerBridge.shared.unregister(timer: restTimer)
             WorkoutLiveActivityWorkoutCoordinator.unregister()
+            WorkoutKeyboardFocusBridge.shared.reset()
+            LockScreenInteractionKeepAwake.endWorkoutHold()
             debouncedSaveTask?.cancel()
             persist()
         }
@@ -157,6 +175,7 @@ struct ActiveWorkoutView: View {
             }
         }
         .onChange(of: orderedExercises.map(\.id)) { _, ids in
+            reconcileExerciseOrder(with: ids)
             if !ids.contains(selectedExerciseID ?? UUID()) {
                 selectedExerciseID = ids.first
             }
@@ -310,22 +329,8 @@ struct ActiveWorkoutView: View {
         }
 
         ToolbarItem(placement: .keyboard) {
-            HStack(spacing: 10) {
-                ForEach(WorkoutKeyboardDestination.allCases) { destination in
-                    Button {
-                        navigateFromKeyboard(to: destination)
-                    } label: {
-                        Image(systemName: destination.systemImage)
-                            .frame(width: 28, height: 28)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(destination == .workout ? Color.accentColor : .primary)
-                    .accessibilityLabel(destination.title)
-                    .accessibilityHint("Opens \(destination.title.lowercased())")
-                }
-
-                Spacer(minLength: 4)
-
+            HStack {
+                Spacer(minLength: 0)
                 Button("Done") { dismissKeyboard() }
                     .fontWeight(.semibold)
             }
@@ -377,24 +382,45 @@ struct ActiveWorkoutView: View {
             }
             .padding(.horizontal)
             .padding(.top, 6)
-            .padding(.bottom, 18)
+            .padding(.bottom, restTimer.isPresented ? 36 : 28)
         }
-        .contentMargins(.bottom, 16, for: .scrollContent)
+        .contentMargins(
+            .bottom,
+            restTimer.isPresented ? 40 : 28,
+            for: .scrollContent
+        )
         .scrollDismissesKeyboard(.interactively)
         .repSoftScrollEdges()
+        .animation(.snappy(duration: 0.25), value: restTimer.isPresented)
     }
 
     private var exerciseNavigation: some View {
         ScrollView(.horizontal) {
             HStack(spacing: 8) {
-                ForEach(orderedExercises) { workoutExercise in
+                RepLiveReorderStack(
+                    items: navigationExerciseBinding,
+                    id: \.id,
+                    axis: .horizontal,
+                    spacing: 8,
+                    hapticsEnabled: hapticsEnabled,
+                    onInteraction: dismissKeyboard,
+                    onStationaryHold: { exerciseID in
+                        guard let workoutExercise = navigationExercises.first(where: { $0.id == exerciseID }) else {
+                            return
+                        }
+                        exercisePendingRemoval = workoutExercise
+                        isShowingRemoveExerciseConfirmation = true
+                    },
+                    onCommit: commitExerciseOrder
+                ) { workoutExercise, _ in
                     let isSelected = workoutExercise.id == currentExercise?.id
                     let completeCount = workoutExercise.sets.filter(\.isCompleted).count
-                    let isComplete = !workoutExercise.sets.isEmpty && completeCount == workoutExercise.sets.count
+                    let isComplete = !workoutExercise.sets.isEmpty
+                        && completeCount == workoutExercise.sets.count
 
                     Button {
                         dismissKeyboard()
-                        withAnimation(.easeOut(duration: 0.18)) {
+                        withAnimation(.easeOut(duration: 0.12)) {
                             selectedExerciseID = workoutExercise.id
                         }
                     } label: {
@@ -406,40 +432,8 @@ struct ActiveWorkoutView: View {
                         )
                     }
                     .buttonStyle(.plain)
-                    .contentShape(.dragPreview, Capsule())
-                    .onDrag {
-                        dismissKeyboard()
-                        if hapticsEnabled {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred(intensity: 0.7)
-                        }
-                        draggedExerciseID = workoutExercise.id
-                        return NSItemProvider(object: workoutExercise.id.uuidString as NSString)
-                    } preview: {
-                        exerciseNavigationPill(
-                            workoutExercise,
-                            isSelected: isSelected,
-                            isComplete: isComplete,
-                            completeCount: completeCount
-                        )
-                        .contentShape(.dragPreview, Capsule())
-                    }
-                    .onDrop(
-                        of: [UTType.text],
-                        delegate: WorkoutExerciseDropDelegate(
-                            targetID: workoutExercise.id,
-                            draggedID: $draggedExerciseID,
-                            onMove: moveExercise,
-                            onDrop: persist
-                        )
-                    )
-                    .contextMenu {
-                        Button("Remove exercise", systemImage: "trash", role: .destructive) {
-                            exercisePendingRemoval = workoutExercise
-                            isShowingRemoveExerciseConfirmation = true
-                        }
-                    }
                     .accessibilityLabel("\(workoutExercise.exercise?.name ?? "Exercise"), \(isComplete ? "complete" : "\(completeCount) of \(workoutExercise.sets.count) sets complete")")
-                    .accessibilityHint("Press and hold for options, or drag to reorder")
+                    .accessibilityHint("Tap to open. Hold and move to reorder; keep holding for remove options")
                     .accessibilityAddTraits(isSelected ? .isSelected : [])
                 }
 
@@ -462,6 +456,7 @@ struct ActiveWorkoutView: View {
             .padding(.vertical, 8)
         }
         .scrollIndicators(.hidden)
+        .scrollClipDisabled()
     }
 
     private func exerciseNavigationPill(
@@ -612,7 +607,7 @@ struct ActiveWorkoutView: View {
                         measurementType: workoutExercise.exercise?.measurementType ?? .weightAndRepetitions,
                         preferredUnit: preferredUnit,
                         weightStep: weightStep(for: workoutExercise.exercise),
-                        onEdit: schedulePersist,
+                        onEdit: { schedulePersist(syncLiveActivity: false) },
                         onToggleCompletion: {
                             dismissKeyboard()
                             toggleCompletion(of: set, in: workoutExercise)
@@ -661,39 +656,28 @@ struct ActiveWorkoutView: View {
         )
         session.exercises.append(workoutExercise)
         session.normalizeExerciseOrder()
+        exerciseOrderIDs = session.orderedExercises.map(\.id)
         session.updatedAt = .now
         selectedExerciseID = workoutExercise.id
         persist()
     }
 
-    private func moveExercise(_ draggedID: UUID, over targetID: UUID) {
-        guard draggedID != targetID else { return }
-
-        var reordered = orderedExercises
-        guard let sourceIndex = reordered.firstIndex(where: { $0.id == draggedID }),
-              let targetIndex = reordered.firstIndex(where: { $0.id == targetID }) else { return }
-
-        withAnimation(.snappy(duration: 0.2)) {
-            reordered.move(
-                fromOffsets: IndexSet(integer: sourceIndex),
-                toOffset: targetIndex > sourceIndex ? targetIndex + 1 : targetIndex
-            )
-            for (index, exercise) in reordered.enumerated() {
-                exercise.orderIndex = index
-            }
-            session.exercises = reordered
+    private func commitExerciseOrder(_ reordered: [WorkoutExercise]) {
+        guard reordered.map(\.id) != orderedExercises.map(\.id) else { return }
+        for (index, exercise) in reordered.enumerated() {
+            exercise.orderIndex = index
         }
-        if hapticsEnabled {
-            UISelectionFeedbackGenerator().selectionChanged()
-        }
+        session.exercises = reordered
+        exerciseOrderIDs = reordered.map(\.id)
         session.updatedAt = .now
-        schedulePersist()
+        persist()
     }
 
     private func removeExercise(_ workoutExercise: WorkoutExercise) {
         let removedIndex = orderedExercises.firstIndex { $0.id == workoutExercise.id } ?? 0
         session.exercises.removeAll { $0.id == workoutExercise.id }
         session.normalizeExerciseOrder()
+        exerciseOrderIDs.removeAll { $0 == workoutExercise.id }
         session.updatedAt = .now
         modelContext.delete(workoutExercise)
         let remainingExercises = session.orderedExercises
@@ -701,6 +685,13 @@ struct ActiveWorkoutView: View {
             ? nil
             : remainingExercises[min(removedIndex, remainingExercises.count - 1)].id
         persist()
+    }
+
+    private func reconcileExerciseOrder(with modelIDs: [UUID]) {
+        let validIDs = Set(modelIDs)
+        let retained = exerciseOrderIDs.filter { validIDs.contains($0) }
+        let retainedIDs = Set(retained)
+        exerciseOrderIDs = retained + modelIDs.filter { !retainedIDs.contains($0) }
     }
 
     private func addSet(to workoutExercise: WorkoutExercise) {
@@ -714,10 +705,15 @@ struct ActiveWorkoutView: View {
             distance: previous?.distance,
             assistanceWeight: previous?.assistanceWeight
         )
-        workoutExercise.sets.append(set)
-        workoutExercise.normalizeSetOrder()
-        session.updatedAt = .now
-        persist()
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            workoutExercise.sets.append(set)
+            workoutExercise.normalizeSetOrder()
+            session.updatedAt = .now
+        }
+        // Persist off the interaction path so the row appears instantly.
+        schedulePersist(syncLiveActivity: false)
     }
 
     private func removeSet(_ set: WorkoutSet, from workoutExercise: WorkoutExercise) {
@@ -821,19 +817,23 @@ struct ActiveWorkoutView: View {
         }
     }
 
-    private func schedulePersist() {
+    private func schedulePersist(syncLiveActivity: Bool = true) {
         debouncedSaveTask?.cancel()
         debouncedSaveTask = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(120))
+            // Yield a frame so SwiftUI can commit the row before we hit SwiftData.
+            await Task.yield()
+            try? await Task.sleep(for: .milliseconds(220))
             guard !Task.isCancelled else { return }
-            persist()
+            persist(syncLiveActivity: syncLiveActivity)
         }
     }
 
-    private func persist() {
+    private func persist(syncLiveActivity: Bool = true) {
         do {
             try modelContext.save()
-            synchronizeLiveActivity()
+            if syncLiveActivity {
+                synchronizeLiveActivity()
+            }
         } catch {
             AppLog.persistenceFailure(operation: "Save active workout", error: error)
             errorMessage = error.localizedDescription
@@ -889,28 +889,6 @@ struct ActiveWorkoutView: View {
         debouncedSaveTask?.cancel()
         persist()
         onKeyboardNavigate(destination)
-    }
-}
-
-private struct WorkoutExerciseDropDelegate: DropDelegate {
-    let targetID: UUID
-    @Binding var draggedID: UUID?
-    let onMove: (UUID, UUID) -> Void
-    let onDrop: () -> Void
-
-    func dropEntered(info: DropInfo) {
-        guard let draggedID, draggedID != targetID else { return }
-        onMove(draggedID, targetID)
-    }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: .move)
-    }
-
-    func performDrop(info: DropInfo) -> Bool {
-        draggedID = nil
-        onDrop()
-        return true
     }
 }
 
@@ -1126,6 +1104,8 @@ private struct OptionalDoubleField: View {
 
     @FocusState private var isFocused: Bool
     @State private var text: String = ""
+    /// First keystroke after focus replaces the whole field (gym logging habit).
+    @State private var replaceOnNextEdit = false
 
     var body: some View {
         TextField("—", text: $text)
@@ -1142,12 +1122,27 @@ private struct OptionalDoubleField: View {
                 guard !isFocused else { return }
                 syncFromValue()
             }
-            .onChange(of: text) { _, text in
+            .onChange(of: text) { oldText, newText in
                 guard isFocused else { return }
-                updateValueWhileTyping(text)
+                if replaceOnNextEdit, newText != oldText {
+                    replaceOnNextEdit = false
+                    if let inserted = replacementInsert(from: oldText, to: newText) {
+                        text = inserted
+                        updateValueWhileTyping(inserted)
+                        return
+                    }
+                }
+                updateValueWhileTyping(newText)
             }
             .onChange(of: isFocused) { _, focused in
-                if !focused { commit() }
+                WorkoutKeyboardFocusBridge.shared.setFocused(focused)
+                if focused {
+                    replaceOnNextEdit = true
+                    selectAllTextInFocusedField()
+                } else {
+                    replaceOnNextEdit = false
+                    commit()
+                }
             }
     }
 
@@ -1200,6 +1195,7 @@ private struct OptionalWeightField: View {
 
     @FocusState private var isFocused: Bool
     @State private var text: String = ""
+    @State private var replaceOnNextEdit = false
 
     var body: some View {
         ZStack {
@@ -1217,12 +1213,27 @@ private struct OptionalWeightField: View {
                     guard !isFocused else { return }
                     syncFromValue()
                 }
-                .onChange(of: text) { _, text in
+                .onChange(of: text) { oldText, newText in
                     guard isFocused else { return }
-                    updateValueWhileTyping(text)
+                    if replaceOnNextEdit, newText != oldText {
+                        replaceOnNextEdit = false
+                        if let inserted = replacementInsert(from: oldText, to: newText) {
+                            text = inserted
+                            updateValueWhileTyping(inserted)
+                            return
+                        }
+                    }
+                    updateValueWhileTyping(newText)
                 }
                 .onChange(of: isFocused) { _, focused in
-                    if !focused { commit() }
+                    WorkoutKeyboardFocusBridge.shared.setFocused(focused)
+                    if focused {
+                        replaceOnNextEdit = true
+                        selectAllTextInFocusedField()
+                    } else {
+                        replaceOnNextEdit = false
+                        commit()
+                    }
                 }
 
             HStack(spacing: 0) {
@@ -1311,6 +1322,7 @@ private struct OptionalIntField: View {
 
     @FocusState private var isFocused: Bool
     @State private var text: String = ""
+    @State private var replaceOnNextEdit = false
 
     var body: some View {
         ZStack {
@@ -1328,12 +1340,27 @@ private struct OptionalIntField: View {
                     guard !isFocused else { return }
                     syncFromValue()
                 }
-                .onChange(of: text) { _, text in
+                .onChange(of: text) { oldText, newText in
                     guard isFocused else { return }
-                    updateValueWhileTyping(text)
+                    if replaceOnNextEdit, newText != oldText {
+                        replaceOnNextEdit = false
+                        if let inserted = replacementInsert(from: oldText, to: newText) {
+                            text = inserted
+                            updateValueWhileTyping(inserted)
+                            return
+                        }
+                    }
+                    updateValueWhileTyping(newText)
                 }
                 .onChange(of: isFocused) { _, focused in
-                    if !focused { commit() }
+                    WorkoutKeyboardFocusBridge.shared.setFocused(focused)
+                    if focused {
+                        replaceOnNextEdit = true
+                        selectAllTextInFocusedField()
+                    } else {
+                        replaceOnNextEdit = false
+                        commit()
+                    }
                 }
 
             HStack(spacing: 0) {
@@ -1402,6 +1429,40 @@ private struct OptionalIntField: View {
         value = newValue
         onCommit()
     }
+}
+
+@MainActor
+private func selectAllTextInFocusedField() {
+    // Two ticks: TextField must become first responder before selectAll sticks.
+    DispatchQueue.main.async {
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.selectAll(_:)),
+            to: nil,
+            from: nil,
+            for: nil
+        )
+        DispatchQueue.main.async {
+            UIApplication.shared.sendAction(
+                #selector(UIResponder.selectAll(_:)),
+                to: nil,
+                from: nil,
+                for: nil
+            )
+        }
+    }
+}
+
+/// When select-all fails, treat the first edit as a full replace using the inserted chars.
+private func replacementInsert(from oldText: String, to newText: String) -> String? {
+    if newText.hasPrefix(oldText), newText.count > oldText.count {
+        return String(newText.dropFirst(oldText.count))
+    }
+    if oldText.hasPrefix(newText) {
+        // Deletion / backspace — keep normal editing.
+        return nil
+    }
+    // Mixed edit while selection was active — keep newText as-is.
+    return nil
 }
 
 private func parsedLocalizedDecimal(_ text: String) -> Double? {

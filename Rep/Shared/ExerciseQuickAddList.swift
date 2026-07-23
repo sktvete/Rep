@@ -15,11 +15,21 @@ struct ExerciseQuickAddList: View {
 
     @State private var searchText = ""
     @State private var detailExercise: Exercise?
-    @State private var thumbnailsEnabled = false
+    @State private var thumbnailsEnabled = ExercisePickerSessionCache.leadingThumbnailsReady
     @State private var prepareTask: Task<Void, Never>?
     @State private var thumbnailTask: Task<Void, Never>?
 
     private var searchModel: ExercisePickerSearchModel { ExercisePickerSessionCache.searchModel }
+
+    private var isBrowsing: Bool {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Browse may paint from the launch cache; search stays placeholder-only to avoid hitch.
+    private var shouldLoadThumbnails: Bool {
+        guard isBrowsing else { return false }
+        return thumbnailsEnabled || ExercisePickerSessionCache.leadingThumbnailsReady
+    }
 
     var body: some View {
         Group {
@@ -41,7 +51,7 @@ struct ExerciseQuickAddList: View {
                     ForEach(Array(searchModel.displayed.enumerated()), id: \.element.id) { index, exercise in
                         ExercisePickerRow(
                             exercise: exercise,
-                            loadsImages: thumbnailsEnabled,
+                            loadsImages: shouldLoadThumbnails,
                             listIndex: index,
                             onSelect: {
                                 onSelect(exercise)
@@ -51,9 +61,10 @@ struct ExerciseQuickAddList: View {
                             },
                             onShowDetails: { detailExercise = exercise }
                         )
+                        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                     }
 
-                    if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                    if isBrowsing,
                        exercises.count > searchModel.displayed.count {
                         Text("Type to search \(exercises.count) exercises")
                             .font(.footnote)
@@ -89,17 +100,36 @@ struct ExerciseQuickAddList: View {
             ExerciseDetailView(exercise: exercise)
         }
         .exerciseThumbnailScope {
-            ExerciseThumbnailPrefetch.sources(from: searchModel.displayed, thumbnailSize: 58)
+            // Lower LOD than detail views — list stutter is dominated by decode cost.
+            ExerciseThumbnailPrefetch.sources(
+                from: searchModel.displayed,
+                thumbnailSize: ExerciseThumbnailSizing.pickerPointSize
+            )
         }
         .onAppear {
-            ExercisePickerThumbnailGate.disableThumbnails(&thumbnailsEnabled, task: &thumbnailTask)
+            if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                ExercisePickerThumbnailGate.configureForBrowse(
+                    thumbnailsEnabled: &thumbnailsEnabled,
+                    task: &thumbnailTask
+                )
+            }
             schedulePrepare()
         }
         .onDisappear {
             prepareTask?.cancel()
-            ExercisePickerThumbnailGate.disableThumbnails(&thumbnailsEnabled, task: &thumbnailTask)
+            thumbnailTask?.cancel()
         }
         .onChange(of: searchText) { _, newValue in
+            let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                ExercisePickerThumbnailGate.configureForBrowse(
+                    thumbnailsEnabled: &thumbnailsEnabled,
+                    task: &thumbnailTask
+                )
+            } else {
+                // Search results stay placeholder-only — decode is the hitch source.
+                ExercisePickerThumbnailGate.disableThumbnails(&thumbnailsEnabled, task: &thumbnailTask)
+            }
             ExercisePickerSessionCache.prepare(
                 exercises: exercises,
                 query: newValue,
@@ -107,6 +137,8 @@ struct ExerciseQuickAddList: View {
             )
         }
         .onChange(of: searchModel.isRefreshing) { _, isRefreshing in
+            // Only reveal thumbs when browsing; never after a search settle.
+            guard isBrowsing else { return }
             ExercisePickerThumbnailGate.scheduleReveal(
                 thumbnailsEnabled: $thumbnailsEnabled,
                 isSearching: isRefreshing,

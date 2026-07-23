@@ -31,11 +31,16 @@ enum ExerciseWeightStep {
             break
         }
 
-        // Plate-loaded bars: +5 kg total (2.5 kg per side).
+        // Cable stacks (triceps pushdown etc.): smallest stack plate is 2.5 kg.
+        if exercise.equipment == .cable {
+            return 2.5
+        }
+
+        // Plate-loaded bars: +5 kg.
         switch exercise.equipment {
         case .barbell, .smithMachine:
             return 5
-        case .dumbbell, .kettlebell, .cable, .machine, .bodyweight, .other:
+        case .dumbbell, .kettlebell, .machine, .bodyweight, .other, .cable:
             break
         }
 
@@ -47,12 +52,14 @@ enum ExerciseWeightStep {
         }
 
         switch exercise.equipment {
-        case .dumbbell, .kettlebell, .cable:
+        case .dumbbell, .kettlebell:
             return 2.5
         case .machine:
             return 5
         case .barbell, .smithMachine:
             return 5
+        case .cable:
+            return 2.5
         case .bodyweight, .other:
             return 2.5
         }

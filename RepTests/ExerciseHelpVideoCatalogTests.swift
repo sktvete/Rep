@@ -121,6 +121,10 @@ struct ExerciseHelpVideoCatalogTests {
         #expect(catalogExercise.helpYouTubeVideoID == "rT7DgCr-3pg")
         #expect(catalogExercise.helpVideoChannel == "ScottHermanFitness")
         #expect(customExercise.helpYouTubeVideoID == nil)
+        #expect(
+            ExerciseHelpVideoCatalog.thumbnailURL(forVideoID: "rT7DgCr-3pg")?.absoluteString
+                == "https://i.ytimg.com/vi/rT7DgCr-3pg/hqdefault.jpg"
+        )
     }
 
     @Test("Loads the shipped catalog from the application bundle")

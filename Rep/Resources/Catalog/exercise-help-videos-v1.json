@@ -1,641 +1,19 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "2026.07.17.1",
-  "publishedAt": "2026-07-17T00:00:00Z",
+  "catalogVersion": "2026.07.21.1",
+  "publishedAt": "2026-07-21T00:00:00Z",
   "bundledExerciseCount": 873,
   "ascendApiExerciseCount": 1500,
   "mappings": [
-    {
-      "exerciseId": "rep:local:barbell-bench-press",
-      "exerciseName": "Barbell Bench Press",
-      "equipment": "other",
-      "youtubeVideoId": "ptpmRrzRtWQ",
-      "title": "The Fastest Way To Blow Up Your Bench Press (4 Science-Based Steps) + Sample Program",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:squat",
-      "exerciseName": "Squat",
-      "equipment": "barbell",
-      "youtubeVideoId": "bEv6CCg2BC8",
-      "title": "How To Get A Huge Squat With Perfect Technique (Fix Mistakes)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:back-squat",
-      "exerciseName": "Back Squat",
-      "equipment": "barbell",
-      "youtubeVideoId": "bEv6CCg2BC8",
-      "title": "How To Get A Huge Squat With Perfect Technique (Fix Mistakes)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:deadlift",
-      "exerciseName": "Deadlift",
-      "equipment": "barbell",
-      "youtubeVideoId": "VL5Ab0T07e4",
-      "title": "Build A Bigger Deadlift With Perfect Technique (Conventional Form)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "lBDjFxJ",
-      "exerciseName": "Pull-Up",
-      "equipment": "bodyweight",
-      "youtubeVideoId": "Hdc7Mw6BIEE",
-      "title": "The Best Way To Do Pull Ups For A Wide Back (Optimal Training Technique)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "I4hDWkc",
-      "exerciseName": "Push-Up",
-      "equipment": "bodyweight",
-      "youtubeVideoId": "b6ouj88iBZs",
-      "title": "The Perfect Push Workout (According To Science)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:barbell-overhead-press",
-      "exerciseName": "Barbell Overhead Press",
-      "equipment": "barbell",
-      "youtubeVideoId": "_RlRDWO2jfg",
-      "title": "Build Bigger Shoulders With Perfect Training Technique (The Overhead Press)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:overhead-press",
-      "exerciseName": "Overhead Press",
-      "equipment": "barbell",
-      "youtubeVideoId": "_RlRDWO2jfg",
-      "title": "Build Bigger Shoulders With Perfect Training Technique (The Overhead Press)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:barbell-row",
-      "exerciseName": "Barbell Row",
-      "equipment": "barbell",
-      "youtubeVideoId": "axoeDmW0oAY",
-      "title": "How To Build a Thick Back With Perfect Rowing Technique (Pendlay Row/ Helms Row)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:bent-over-row",
-      "exerciseName": "Bent Over Row",
-      "equipment": "barbell",
-      "youtubeVideoId": "djKXLt7kv7Q",
-      "title": "How To Do Dumbbell Rows: Build a Thicker Back With Proper \"Cheating\"",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:lat-pulldown",
-      "exerciseName": "Lat Pulldown",
-      "equipment": "cable",
-      "youtubeVideoId": "O94yEoGXtBY",
-      "title": "How To Build A V-Tapered Back: Lat Training Dos and Don\u2019ts",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:dumbbell-bench-press",
-      "exerciseName": "Dumbbell Bench Press",
-      "equipment": "other",
-      "youtubeVideoId": "ptpmRrzRtWQ",
-      "title": "The Fastest Way To Blow Up Your Bench Press (4 Science-Based Steps) + Sample Program",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:incline-barbell-bench-press",
-      "exerciseName": "Incline Barbell Bench Press",
-      "equipment": "other",
-      "youtubeVideoId": "ptpmRrzRtWQ",
-      "title": "The Fastest Way To Blow Up Your Bench Press (4 Science-Based Steps) + Sample Program",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:incline-dumbbell-press",
-      "exerciseName": "Incline Dumbbell Press",
-      "equipment": "other",
-      "youtubeVideoId": "ptpmRrzRtWQ",
-      "title": "The Fastest Way To Blow Up Your Bench Press (4 Science-Based Steps) + Sample Program",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:romanian-deadlift",
-      "exerciseName": "Romanian Deadlift",
-      "equipment": "other",
-      "youtubeVideoId": "_oyxCn2iSjU",
-      "title": "HOW TO DO ROMANIAN DEADLIFTS (RDLs): Build Beefy Hamstrings With Perfect Technique",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:Leg_Press",
-      "exerciseName": "Leg Press",
-      "equipment": "machine",
-      "youtubeVideoId": "hRZ5MM6gmlE",
-      "title": "The Leg Workout I Followed For My 1 Year Transformation",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15",
-      "bundledCatalogID": "rep:free-exercise-db:Leg_Press"
-    },
-    {
-      "exerciseId": "rep:local:dumbbell-shoulder-press",
-      "exerciseName": "Dumbbell Shoulder Press",
-      "equipment": "other",
-      "youtubeVideoId": "MT9ZeE5JJsI",
-      "title": "7 Things That Helped My Shoulders Grow",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:barbell-curl",
-      "exerciseName": "Barbell Curl",
-      "equipment": "other",
-      "youtubeVideoId": "ErOhLVv96Hg",
-      "title": "StudyInTheSpotlight: Do Lying Leg Curls and Deadlifts Activate the Hamstrings Differently?",
-      "channel": "Menno Henselmans",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:dumbbell-curl",
-      "exerciseName": "Dumbbell Curl",
-      "equipment": "other",
-      "youtubeVideoId": "Jfp4b5Olc7A",
-      "title": "How To PROPERLY Dumbbell Curl For Bigger Biceps (FIX YOUR FORM NOW)",
-      "channel": "Colossus Fitness",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:Triceps_Pushdown",
-      "exerciseName": "Triceps Pushdown",
-      "equipment": "cable",
-      "youtubeVideoId": "OpRMRhr0Ycc",
-      "title": "The Best & Worst TRICEPS Exercises (Ranked Using Science)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15",
-      "bundledCatalogID": "rep:free-exercise-db:Triceps_Pushdown"
-    },
-    {
-      "exerciseId": "rep:local:tricep-pushdown",
-      "exerciseName": "Tricep Pushdown",
-      "equipment": "cable",
-      "youtubeVideoId": "OpRMRhr0Ycc",
-      "title": "The Best & Worst TRICEPS Exercises (Ranked Using Science)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:dumbbell-lateral-raise",
-      "exerciseName": "Dumbbell Lateral Raise",
-      "equipment": "other",
-      "youtubeVideoId": "ZpSMEgdyYa4",
-      "title": "Try this lateral raise variant to stimulate stretch-mediated hypertrophy",
-      "channel": "Menno Henselmans",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:seated-cable-row",
-      "exerciseName": "Seated Cable Row",
-      "equipment": "cable",
-      "youtubeVideoId": "PAXkl-AdJFg",
-      "title": "How To Train Back WIDTH vs THICKNESS (Close vs Wide Grip? Rows or Pullups?)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:leg-extension",
-      "exerciseName": "Leg Extension",
-      "equipment": "machine",
-      "youtubeVideoId": "hRZ5MM6gmlE",
-      "title": "The Leg Workout I Followed For My 1 Year Transformation",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:lying-leg-curl",
-      "exerciseName": "Lying Leg Curl",
-      "equipment": "machine",
-      "youtubeVideoId": "8zWDuWKdBZU",
-      "title": "The Perfect Leg Day (According To Science)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:Seated_Leg_Curl",
-      "exerciseName": "Seated Leg Curl",
-      "equipment": "machine",
-      "youtubeVideoId": "hRZ5MM6gmlE",
-      "title": "The Leg Workout I Followed For My 1 Year Transformation",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15",
-      "bundledCatalogID": "rep:free-exercise-db:Seated_Leg_Curl"
-    },
-    {
-      "exerciseId": "rep:local:front-squat",
-      "exerciseName": "Front Squat",
-      "equipment": "barbell",
-      "youtubeVideoId": "v-mQm_droHg",
-      "title": "HOW TO FRONT SQUAT: Build Bigger Quads & A Stronger Squat",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:hammer-curl",
-      "exerciseName": "Hammer Curl",
-      "equipment": "other",
-      "youtubeVideoId": "G7hy-AxQwcQ",
-      "title": "How To PROPERLY Hammer Curl For Bigger Biceps (FIX YOUR FORM NOW)",
-      "channel": "Colossus Fitness",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "T2mxWqc",
-      "exerciseName": "Chin-Up",
-      "equipment": "bodyweight",
-      "youtubeVideoId": "6769A7iAUIc",
-      "title": "Pull Up vs Chin Up - Which is Better For Size and Definition?",
-      "channel": "Colossus Fitness",
-      "verifiedAt": "2026-07-15",
-      "bundledCatalogID": "rep:free-exercise-db:Chin-Up"
-    },
-    {
-      "exerciseId": "rep:local:dip",
-      "exerciseName": "Dip",
-      "equipment": "bodyweight",
-      "youtubeVideoId": "yN6Q1UI_xkE",
-      "title": "How To Do Dips For A Bigger Chest and Shoulders (Fix Mistakes!)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:Face_Pull",
-      "exerciseName": "Face Pull",
-      "equipment": "cable",
-      "youtubeVideoId": "PhQ58vPyynQ",
-      "title": "How to Fix A Problem Pull-Up (AMAZING CHANGES)",
-      "channel": "Squat University",
-      "verifiedAt": "2026-07-15",
-      "bundledCatalogID": "rep:free-exercise-db:Face_Pull"
-    },
-    {
-      "exerciseId": "rep:local:barbell-hip-thrust",
-      "exerciseName": "Barbell Hip Thrust",
-      "equipment": "other",
-      "youtubeVideoId": "xDmFkJxPzeM",
-      "title": "How To Build Great Glutes with Perfect Hip Thrust Technique (Fix Mistakes!)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:hip-thrust",
-      "exerciseName": "Hip Thrust",
-      "equipment": "other",
-      "youtubeVideoId": "xDmFkJxPzeM",
-      "title": "How To Build Great Glutes with Perfect Hip Thrust Technique (Fix Mistakes!)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:Goblet_Squat",
-      "exerciseName": "Goblet Squat",
-      "equipment": "kettlebell",
-      "youtubeVideoId": "ShvTpCsgTiw",
-      "title": "How to Perform a Goblet Squat Stretch",
-      "channel": "Squat University",
-      "verifiedAt": "2026-07-15",
-      "bundledCatalogID": "rep:free-exercise-db:Goblet_Squat"
-    },
-    {
-      "exerciseId": "rep:local:bulgarian-split-squat",
-      "exerciseName": "Bulgarian Split Squat",
-      "equipment": "other",
-      "youtubeVideoId": "hPlKPjohFS0",
-      "title": "The PERFECT Bulgarian Split Squat (Avoid These Errors!)",
-      "channel": "Squat University",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:walking-lunge",
-      "exerciseName": "Walking Lunge",
-      "equipment": "other",
-      "youtubeVideoId": "rGpIVqAQc-Y",
-      "title": "Off-Season Leg Workout / 395x5 Squat / 100 lb Dumbbell Walking Lunges",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:lunge",
-      "exerciseName": "Lunge",
-      "equipment": "other",
-      "youtubeVideoId": "NcDtORTfVNQ",
-      "title": "How to PROPERLY Barbell Lunge (AVOID THESE MISTAKES)",
-      "channel": "Colossus Fitness",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:cable-fly",
-      "exerciseName": "Cable Fly",
-      "equipment": "cable",
-      "youtubeVideoId": "wDJozUD0bnQ",
-      "title": "How to PROPERLY Cable Chest Fly (FIX YOUR FORM NOW)",
-      "channel": "Colossus Fitness",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:machine-chest-press",
-      "exerciseName": "Machine Chest Press",
-      "equipment": "machine",
-      "youtubeVideoId": "ptpmRrzRtWQ",
-      "title": "The Fastest Way To Blow Up Your Bench Press (4 Science-Based Steps) + Sample Program",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:machine-shoulder-press",
-      "exerciseName": "Machine Shoulder Press",
-      "equipment": "machine",
-      "youtubeVideoId": "21lYP86dHW4",
-      "title": "Top 3 Shoulder Exercises For 3D Delts",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:skull-crusher",
-      "exerciseName": "Skull Crusher",
-      "equipment": "other",
-      "youtubeVideoId": "ZCSXngTm0ok",
-      "title": "How to PROPERLY Perform the Skull Crusher Exercise | Variation to Avoid Elbow Pain NOW!",
-      "channel": "Colossus Fitness",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:overhead-triceps-extension",
-      "exerciseName": "Overhead Triceps Extension",
-      "equipment": "other",
-      "youtubeVideoId": "OpRMRhr0Ycc",
-      "title": "The Best & Worst TRICEPS Exercises (Ranked Using Science)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "G08RZcQ",
-      "exerciseName": "Cable Curl",
-      "equipment": "cable",
-      "youtubeVideoId": "2MUEL4nL6hA",
-      "title": "How to PROPERLY Cable Bicep Curl For Bigger Biceps (EASY FIX)",
-      "channel": "Colossus Fitness",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:standing-calf-raise",
-      "exerciseName": "Standing Calf Raise",
-      "equipment": "machine",
-      "youtubeVideoId": "SVtg-1loH4c",
-      "title": "How to PROPERLY Standing Calf Raise | Tips & Common Mistakes",
-      "channel": "Colossus Fitness",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:Seated_Calf_Raise",
-      "exerciseName": "Seated Calf Raise",
-      "equipment": "machine",
-      "youtubeVideoId": "6O5hh1rBtx8",
-      "title": "How to PROPERLY Calf Raise (SEATED CALF RAISE TIPS)",
-      "channel": "Colossus Fitness",
-      "verifiedAt": "2026-07-15",
-      "bundledCatalogID": "rep:free-exercise-db:Seated_Calf_Raise"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:Plank",
-      "exerciseName": "Plank",
-      "equipment": "bodyweight",
-      "youtubeVideoId": "fkjglpAWEHs",
-      "title": "Are  you STILL doing planks?",
-      "channel": "Squat University",
-      "verifiedAt": "2026-07-15",
-      "bundledCatalogID": "rep:free-exercise-db:Plank"
-    },
-    {
-      "exerciseId": "I3tsCnC",
-      "exerciseName": "Hanging Leg Raise",
-      "equipment": "bodyweight",
-      "youtubeVideoId": "8zWDuWKdBZU",
-      "title": "The Perfect Leg Day (According To Science)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15",
-      "bundledCatalogID": "rep:free-exercise-db:Hanging_Leg_Raise"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:Cable_Crunch",
-      "exerciseName": "Cable Crunch",
-      "equipment": "cable",
-      "youtubeVideoId": "AV5PmZJIrrw",
-      "title": "How to PROPERLY Cable Crunch to Shape Your Abs (How to Kneeling Cable Abdominal Crunch)",
-      "channel": "Colossus Fitness",
-      "verifiedAt": "2026-07-15",
-      "bundledCatalogID": "rep:free-exercise-db:Cable_Crunch"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:Sumo_Deadlift",
-      "exerciseName": "Sumo Deadlift",
-      "equipment": "barbell",
-      "youtubeVideoId": "XsrD5y8EIKU",
-      "title": "The Most Effective Way to Deadlift for Muscle and Strength (Sumo Technique Explained)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15",
-      "bundledCatalogID": "rep:free-exercise-db:Sumo_Deadlift"
-    },
-    {
-      "exerciseId": "UHJlbu3",
-      "exerciseName": "Kettlebell Swing",
-      "equipment": "kettlebell",
-      "youtubeVideoId": "rG_4uo5oQkk",
-      "title": "7 Kettlebell Exercises For FULL BODY Strength!",
-      "channel": "Squat University",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:one-arm-dumbbell-row",
-      "exerciseName": "One-Arm Dumbbell Row",
-      "equipment": "other",
-      "youtubeVideoId": "djKXLt7kv7Q",
-      "title": "How To Do Dumbbell Rows: Build a Thicker Back With Proper \"Cheating\"",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:reverse-pec-deck",
-      "exerciseName": "Reverse Pec Deck",
-      "equipment": "machine",
-      "youtubeVideoId": "dC7jhEk-29A",
-      "title": "How to PROPERLY Reverse Pec Deck Fly (DO THIS)",
-      "channel": "Colossus Fitness",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "goJ6ezq",
-      "exerciseName": "Cable Lateral Raise",
-      "equipment": "cable",
-      "youtubeVideoId": "IdNOahFD450",
-      "title": "The Lateral Raise Is The ONLY Must-Do Exercise (MY RESPONSE)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:cable-glute-kickback",
-      "exerciseName": "Cable Glute Kickback",
-      "equipment": "cable",
-      "youtubeVideoId": "dJa_Nf4zdik",
-      "title": "Build Bigger Glutes With Perfect Training Technique ft. Stephanie Buttermore (Glute Kickback)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:farmer-carry",
-      "exerciseName": "Farmer Carry",
-      "equipment": "other",
-      "youtubeVideoId": "7D96dK6oaP8",
-      "title": "Core Stability: Side  Bends or Suitcase Carry? |#AskSquatU Show Ep. 47|",
-      "channel": "Squat University",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:ab-wheel-rollout",
-      "exerciseName": "Ab Wheel Rollout",
-      "equipment": "bodyweight",
-      "youtubeVideoId": "Sk8wZXi0_0A",
-      "title": "How to Properly Use The Ab Wheel (GET SHREDDED ABS NOW)",
-      "channel": "Colossus Fitness",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "HMzLjXx",
-      "exerciseName": "Weighted Pull-Up",
-      "equipment": "other",
-      "youtubeVideoId": "Hdc7Mw6BIEE",
-      "title": "The Best Way To Do Pull Ups For A Wide Back (Optimal Training Technique)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:smith-machine-squat",
-      "exerciseName": "Smith Machine Squat",
-      "equipment": "smithMachine",
-      "youtubeVideoId": "sdeQjm7avi8",
-      "title": "The Fastest Way To Blow Up Your Squat (4 Science-Based Steps)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:local:assisted-dip",
-      "exerciseName": "Assisted Dip",
-      "equipment": "machine",
-      "youtubeVideoId": "yN6Q1UI_xkE",
-      "title": "How To Do Dips For A Bigger Chest and Shoulders (Fix Mistakes!)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-15"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:Dumbbell_Bench_Press",
-      "bundledCatalogID": "rep:free-exercise-db:Dumbbell_Bench_Press",
-      "exerciseName": "Dumbbell Bench Press",
-      "equipment": "dumbbell",
-      "youtubeVideoId": "ptpmRrzRtWQ",
-      "title": "The Fastest Way To Blow Up Your Bench Press (4 Science-Based Steps) + Sample Program",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-16"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:Incline_Dumbbell_Press",
-      "bundledCatalogID": "rep:free-exercise-db:Incline_Dumbbell_Press",
-      "exerciseName": "Incline Dumbbell Press",
-      "equipment": "dumbbell",
-      "youtubeVideoId": "ptpmRrzRtWQ",
-      "title": "The Fastest Way To Blow Up Your Bench Press (4 Science-Based Steps) + Sample Program",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-16"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:Romanian_Deadlift",
-      "bundledCatalogID": "rep:free-exercise-db:Romanian_Deadlift",
-      "exerciseName": "Romanian Deadlift",
-      "equipment": "barbell",
-      "youtubeVideoId": "_oyxCn2iSjU",
-      "title": "HOW TO DO ROMANIAN DEADLIFTS (RDLs): Build Beefy Hamstrings With Perfect Technique",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-16"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:Dumbbell_Shoulder_Press",
-      "bundledCatalogID": "rep:free-exercise-db:Dumbbell_Shoulder_Press",
-      "exerciseName": "Dumbbell Shoulder Press",
-      "equipment": "dumbbell",
-      "youtubeVideoId": "MT9ZeE5JJsI",
-      "title": "7 Things That Helped My Shoulders Grow",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-16"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:Barbell_Curl",
-      "bundledCatalogID": "rep:free-exercise-db:Barbell_Curl",
-      "exerciseName": "Barbell Curl",
-      "equipment": "barbell",
-      "youtubeVideoId": "ErOhLVv96Hg",
-      "title": "StudyInTheSpotlight: Do Lying Leg Curls and Deadlifts Activate the Hamstrings Differently?",
-      "channel": "Menno Henselmans",
-      "verifiedAt": "2026-07-16"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:Barbell_Hip_Thrust",
-      "bundledCatalogID": "rep:free-exercise-db:Barbell_Hip_Thrust",
-      "exerciseName": "Barbell Hip Thrust",
-      "equipment": "barbell",
-      "youtubeVideoId": "xDmFkJxPzeM",
-      "title": "How To Build Great Glutes with Perfect Hip Thrust Technique (Fix Mistakes!)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-16"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:One-Arm_Dumbbell_Row",
-      "bundledCatalogID": "rep:free-exercise-db:One-Arm_Dumbbell_Row",
-      "exerciseName": "One-Arm Dumbbell Row",
-      "equipment": "dumbbell",
-      "youtubeVideoId": "djKXLt7kv7Q",
-      "title": "How To Do Dumbbell Rows: Build a Thicker Back With Proper \"Cheating\"",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-16"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:Smith_Machine_Squat",
-      "bundledCatalogID": "rep:free-exercise-db:Smith_Machine_Squat",
-      "exerciseName": "Smith Machine Squat",
-      "equipment": "machine",
-      "youtubeVideoId": "sdeQjm7avi8",
-      "title": "The Fastest Way To Blow Up Your Squat (4 Science-Based Steps)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-16"
-    },
     {
       "exerciseId": "rep:free-exercise-db:3_4_Sit-Up",
       "bundledCatalogID": "rep:free-exercise-db:3_4_Sit-Up",
       "exerciseName": "3/4 Sit-Up",
       "equipment": "bodyweight",
-      "youtubeVideoId": "cu0fHp8HCDo",
-      "title": "Best Exercises To Increase L-SIT HOLD",
-      "channel": "FitnessFAQs",
-      "verifiedAt": "2026-07-16"
+      "youtubeVideoId": "1fbU_MkV7NE",
+      "title": "How to Do a Sit Up",
+      "channel": "LIVESTRONG",
+      "verifiedAt": "2026-07-21"
     },
     {
       "exerciseId": "rep:free-exercise-db:90_90_Hamstring",
@@ -666,6 +44,15 @@
       "title": "Foam Roller- \"Myofascial Release\"",
       "channel": "ScottHermanFitness",
       "verifiedAt": "2026-07-16"
+    },
+    {
+      "exerciseId": "rep:local:ab-wheel-rollout",
+      "exerciseName": "Ab Wheel Rollout",
+      "equipment": "bodyweight",
+      "youtubeVideoId": "Sk8wZXi0_0A",
+      "title": "How to Properly Use The Ab Wheel (GET SHREDDED ABS NOW)",
+      "channel": "Colossus Fitness",
+      "verifiedAt": "2026-07-15"
     },
     {
       "exerciseId": "rep:free-exercise-db:Adductor",
@@ -808,6 +195,16 @@
       "verifiedAt": "2026-07-16"
     },
     {
+      "exerciseId": "rep:free-exercise-db:Ankle_Circles",
+      "bundledCatalogID": "rep:free-exercise-db:Ankle_Circles",
+      "exerciseName": "Ankle Circles",
+      "equipment": "other",
+      "youtubeVideoId": "4GW6QdSaQ6U",
+      "title": "How To Improve Your Ankle Mobility (Stretches & Exercises)",
+      "channel": "E3 Rehab",
+      "verifiedAt": "2026-07-16"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:Ankle_On_The_Knee",
       "bundledCatalogID": "rep:free-exercise-db:Ankle_On_The_Knee",
       "exerciseName": "Ankle On The Knee",
@@ -848,6 +245,15 @@
       "verifiedAt": "2026-07-16"
     },
     {
+      "exerciseId": "rep:local:assisted-dip",
+      "exerciseName": "Assisted Dip",
+      "equipment": "machine",
+      "youtubeVideoId": "yN6Q1UI_xkE",
+      "title": "How To Do Dips For A Bigger Chest and Shoulders (Fix Mistakes!)",
+      "channel": "Jeff Nippard",
+      "verifiedAt": "2026-07-15"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:Atlas_Stone_Trainer",
       "bundledCatalogID": "rep:free-exercise-db:Atlas_Stone_Trainer",
       "exerciseName": "Atlas Stone Trainer",
@@ -886,6 +292,16 @@
       "title": "The Best And Worst Back Exercises (Ranked By Science)",
       "channel": "Jeff Nippard",
       "verifiedAt": "2026-07-16"
+    },
+    {
+      "exerciseId": "rep:local:back-squat",
+      "bundledCatalogID": null,
+      "exerciseName": "Back Squat",
+      "equipment": "barbell",
+      "youtubeVideoId": "eqv29gachoo",
+      "title": "Back Squat - Short Demo",
+      "channel": "TrainHeroic",
+      "verifiedAt": "2026-07-21"
     },
     {
       "exerciseId": "rep:free-exercise-db:Backward_Drag",
@@ -998,6 +414,16 @@
       "verifiedAt": "2026-07-16"
     },
     {
+      "exerciseId": "rep:local:barbell-bench-press",
+      "bundledCatalogID": null,
+      "exerciseName": "Barbell Bench Press",
+      "equipment": "other",
+      "youtubeVideoId": "Pp8rHcFVIYg",
+      "title": "Barbell Bench Press \u2013 Proper Form Tutorial (Beginner Friendly)",
+      "channel": "6th Pillar Coaching",
+      "verifiedAt": "2026-07-21"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:Barbell_Bench_Press_-_Medium_Grip",
       "bundledCatalogID": "rep:free-exercise-db:Barbell_Bench_Press_-_Medium_Grip",
       "exerciseName": "Barbell Bench Press - Medium Grip",
@@ -1066,6 +492,25 @@
       "title": "How To Get A Huge Squat With Perfect Technique (Fix Mistakes)",
       "channel": "Jeff Nippard",
       "verifiedAt": "2026-07-16"
+    },
+    {
+      "exerciseId": "rep:free-exercise-db:Barbell_Hip_Thrust",
+      "bundledCatalogID": "rep:free-exercise-db:Barbell_Hip_Thrust",
+      "exerciseName": "Barbell Hip Thrust",
+      "equipment": "barbell",
+      "youtubeVideoId": "pBH7pKHn-dI",
+      "title": "How to Perform Barbell Hip Thrusts | Glutes Exercise Tutorial",
+      "channel": "Buff Dudes Workouts",
+      "verifiedAt": "2026-07-21"
+    },
+    {
+      "exerciseId": "rep:local:barbell-hip-thrust",
+      "exerciseName": "Barbell Hip Thrust",
+      "equipment": "other",
+      "youtubeVideoId": "xDmFkJxPzeM",
+      "title": "How To Build Great Glutes with Perfect Hip Thrust Technique (Fix Mistakes!)",
+      "channel": "Jeff Nippard",
+      "verifiedAt": "2026-07-15"
     },
     {
       "exerciseId": "rep:free-exercise-db:Barbell_Incline_Bench_Press_-_Medium_Grip",
@@ -1298,6 +743,36 @@
       "verifiedAt": "2026-07-16"
     },
     {
+      "exerciseId": "rep:free-exercise-db:Bent-Arm_Barbell_Pullover",
+      "bundledCatalogID": "rep:free-exercise-db:Bent-Arm_Barbell_Pullover",
+      "exerciseName": "Bent-Arm Barbell Pullover",
+      "equipment": "barbell",
+      "youtubeVideoId": "2aWk3hF2tVg",
+      "title": "How To Cable Lat Pullover PROPERLY (Feel Your Lats)",
+      "channel": "Colossus Fitness",
+      "verifiedAt": "2026-07-16"
+    },
+    {
+      "exerciseId": "rep:free-exercise-db:Bent-Arm_Dumbbell_Pullover",
+      "bundledCatalogID": "rep:free-exercise-db:Bent-Arm_Dumbbell_Pullover",
+      "exerciseName": "Bent-Arm Dumbbell Pullover",
+      "equipment": "dumbbell",
+      "youtubeVideoId": "2aWk3hF2tVg",
+      "title": "How To Cable Lat Pullover PROPERLY (Feel Your Lats)",
+      "channel": "Colossus Fitness",
+      "verifiedAt": "2026-07-16"
+    },
+    {
+      "exerciseId": "rep:free-exercise-db:Bent-Knee_Hip_Raise",
+      "bundledCatalogID": "rep:free-exercise-db:Bent-Knee_Hip_Raise",
+      "exerciseName": "Bent-Knee Hip Raise",
+      "equipment": "bodyweight",
+      "youtubeVideoId": "1IR4me-fMSk",
+      "title": "Heel Raise (Knees Bent)",
+      "channel": "E3 Rehab Exercise Library",
+      "verifiedAt": "2026-07-16"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:Bent_Over_Barbell_Row",
       "bundledCatalogID": "rep:free-exercise-db:Bent_Over_Barbell_Row",
       "exerciseName": "Bent Over Barbell Row",
@@ -1348,16 +823,6 @@
       "verifiedAt": "2026-07-16"
     },
     {
-      "exerciseId": "rep:free-exercise-db:Ankle_Circles",
-      "bundledCatalogID": "rep:free-exercise-db:Ankle_Circles",
-      "exerciseName": "Ankle Circles",
-      "equipment": "other",
-      "youtubeVideoId": "4GW6QdSaQ6U",
-      "title": "How To Improve Your Ankle Mobility (Stretches & Exercises)",
-      "channel": "E3 Rehab",
-      "verifiedAt": "2026-07-16"
-    },
-    {
       "exerciseId": "rep:free-exercise-db:Bent_Press",
       "bundledCatalogID": "rep:free-exercise-db:Bent_Press",
       "exerciseName": "Bent Press",
@@ -1365,36 +830,6 @@
       "youtubeVideoId": "ptpmRrzRtWQ",
       "title": "The Fastest Way To Blow Up Your Bench Press (4 Science-Based Steps) + Sample Program",
       "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-16"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:Bent-Arm_Barbell_Pullover",
-      "bundledCatalogID": "rep:free-exercise-db:Bent-Arm_Barbell_Pullover",
-      "exerciseName": "Bent-Arm Barbell Pullover",
-      "equipment": "barbell",
-      "youtubeVideoId": "2aWk3hF2tVg",
-      "title": "How To Cable Lat Pullover PROPERLY (Feel Your Lats)",
-      "channel": "Colossus Fitness",
-      "verifiedAt": "2026-07-16"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:Bent-Arm_Dumbbell_Pullover",
-      "bundledCatalogID": "rep:free-exercise-db:Bent-Arm_Dumbbell_Pullover",
-      "exerciseName": "Bent-Arm Dumbbell Pullover",
-      "equipment": "dumbbell",
-      "youtubeVideoId": "2aWk3hF2tVg",
-      "title": "How To Cable Lat Pullover PROPERLY (Feel Your Lats)",
-      "channel": "Colossus Fitness",
-      "verifiedAt": "2026-07-16"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:Bent-Knee_Hip_Raise",
-      "bundledCatalogID": "rep:free-exercise-db:Bent-Knee_Hip_Raise",
-      "exerciseName": "Bent-Knee Hip Raise",
-      "equipment": "bodyweight",
-      "youtubeVideoId": "1IR4me-fMSk",
-      "title": "Heel Raise (Knees Bent)",
-      "channel": "E3 Rehab Exercise Library",
       "verifiedAt": "2026-07-16"
     },
     {
@@ -1518,6 +953,15 @@
       "verifiedAt": "2026-07-16"
     },
     {
+      "exerciseId": "rep:local:bulgarian-split-squat",
+      "exerciseName": "Bulgarian Split Squat",
+      "equipment": "other",
+      "youtubeVideoId": "hPlKPjohFS0",
+      "title": "The PERFECT Bulgarian Split Squat (Avoid These Errors!)",
+      "channel": "Squat University",
+      "verifiedAt": "2026-07-15"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:Butt_Lift_Bridge",
       "bundledCatalogID": "rep:free-exercise-db:Butt_Lift_Bridge",
       "exerciseName": "Butt Lift (Bridge)",
@@ -1558,6 +1002,25 @@
       "verifiedAt": "2026-07-16"
     },
     {
+      "exerciseId": "rep:free-exercise-db:Cable_Crunch",
+      "bundledCatalogID": "rep:free-exercise-db:Cable_Crunch",
+      "exerciseName": "Cable Crunch",
+      "equipment": "cable",
+      "youtubeVideoId": "b9FJ4hIK3pI",
+      "title": "Kneeling Rope Crunch With Proper Form",
+      "channel": "nutritioneering",
+      "verifiedAt": "2026-07-21"
+    },
+    {
+      "exerciseId": "G08RZcQ",
+      "exerciseName": "Cable Curl",
+      "equipment": "cable",
+      "youtubeVideoId": "2MUEL4nL6hA",
+      "title": "How to PROPERLY Cable Bicep Curl For Bigger Biceps (EASY FIX)",
+      "channel": "Colossus Fitness",
+      "verifiedAt": "2026-07-15"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:Cable_Deadlifts",
       "bundledCatalogID": "rep:free-exercise-db:Cable_Deadlifts",
       "exerciseName": "Cable Deadlifts",
@@ -1566,6 +1029,24 @@
       "title": "HOW TO DO ROMANIAN DEADLIFTS (RDLs): Build Beefy Hamstrings With Perfect Technique",
       "channel": "Jeff Nippard",
       "verifiedAt": "2026-07-16"
+    },
+    {
+      "exerciseId": "rep:local:cable-fly",
+      "exerciseName": "Cable Fly",
+      "equipment": "cable",
+      "youtubeVideoId": "wDJozUD0bnQ",
+      "title": "How to PROPERLY Cable Chest Fly (FIX YOUR FORM NOW)",
+      "channel": "Colossus Fitness",
+      "verifiedAt": "2026-07-15"
+    },
+    {
+      "exerciseId": "rep:local:cable-glute-kickback",
+      "exerciseName": "Cable Glute Kickback",
+      "equipment": "cable",
+      "youtubeVideoId": "dJa_Nf4zdik",
+      "title": "Build Bigger Glutes With Perfect Training Technique ft. Stephanie Buttermore (Glute Kickback)",
+      "channel": "Jeff Nippard",
+      "verifiedAt": "2026-07-15"
     },
     {
       "exerciseId": "rep:free-exercise-db:Cable_Hip_Adduction",
@@ -1606,6 +1087,15 @@
       "title": "The Science of Shoulder Internal Rotation (Do These Exercises!)",
       "channel": "Squat University",
       "verifiedAt": "2026-07-16"
+    },
+    {
+      "exerciseId": "goJ6ezq",
+      "exerciseName": "Cable Lateral Raise",
+      "equipment": "cable",
+      "youtubeVideoId": "IdNOahFD450",
+      "title": "The Lateral Raise Is The ONLY Must-Do Exercise (MY RESPONSE)",
+      "channel": "Jeff Nippard",
+      "verifiedAt": "2026-07-15"
     },
     {
       "exerciseId": "rep:free-exercise-db:Cable_Lying_Triceps_Extension",
@@ -1738,6 +1228,16 @@
       "verifiedAt": "2026-07-16"
     },
     {
+      "exerciseId": "rep:free-exercise-db:Calf-Machine_Shoulder_Shrug",
+      "bundledCatalogID": "rep:free-exercise-db:Calf-Machine_Shoulder_Shrug",
+      "exerciseName": "Calf-Machine Shoulder Shrug",
+      "equipment": "machine",
+      "youtubeVideoId": "ufrFCjERMDc",
+      "title": "The #1 Workout That BLEW UP My Shoulders (3 Exercises)",
+      "channel": "Jeremy Ethier",
+      "verifiedAt": "2026-07-16"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:Calf_Press",
       "bundledCatalogID": "rep:free-exercise-db:Calf_Press",
       "exerciseName": "Calf Press",
@@ -1785,16 +1285,6 @@
       "youtubeVideoId": "GAvA3R-l9fk",
       "title": "Ankle and Calf Stretches Protocol",
       "channel": "FitnessFAQs",
-      "verifiedAt": "2026-07-16"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:Calf-Machine_Shoulder_Shrug",
-      "bundledCatalogID": "rep:free-exercise-db:Calf-Machine_Shoulder_Shrug",
-      "exerciseName": "Calf-Machine Shoulder Shrug",
-      "equipment": "machine",
-      "youtubeVideoId": "ufrFCjERMDc",
-      "title": "The #1 Workout That BLEW UP My Shoulders (3 Exercises)",
-      "channel": "Jeremy Ethier",
       "verifiedAt": "2026-07-16"
     },
     {
@@ -1908,6 +1398,16 @@
       "verifiedAt": "2026-07-16"
     },
     {
+      "exerciseId": "rep:free-exercise-db:Chest_Push_from_3_point_stance",
+      "bundledCatalogID": "rep:free-exercise-db:Chest_Push_from_3_point_stance",
+      "exerciseName": "Chest Push from 3 point stance",
+      "equipment": "other",
+      "youtubeVideoId": "KK2dx_Bq79w",
+      "title": "Bench Slide- The ONE TIP Missing From Your Chest Workouts!",
+      "channel": "ScottHermanFitness",
+      "verifiedAt": "2026-07-16"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:Chest_Push_multiple_response",
       "bundledCatalogID": "rep:free-exercise-db:Chest_Push_multiple_response",
       "exerciseName": "Chest Push (multiple response)",
@@ -1925,16 +1425,6 @@
       "youtubeVideoId": "iPf8iNGzfmE",
       "title": "My Best CHEST Training Tips (Push Workout Walkthrough)",
       "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-16"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:Chest_Push_from_3_point_stance",
-      "bundledCatalogID": "rep:free-exercise-db:Chest_Push_from_3_point_stance",
-      "exerciseName": "Chest Push from 3 point stance",
-      "equipment": "other",
-      "youtubeVideoId": "KK2dx_Bq79w",
-      "title": "Bench Slide- The ONE TIP Missing From Your Chest Workouts!",
-      "channel": "ScottHermanFitness",
       "verifiedAt": "2026-07-16"
     },
     {
@@ -1976,6 +1466,16 @@
       "title": "How To Do Dips For A Bigger Chest and Shoulders (Fix Mistakes!)",
       "channel": "Jeff Nippard",
       "verifiedAt": "2026-07-16"
+    },
+    {
+      "exerciseId": "rep:free-exercise-db:Chin-Up",
+      "bundledCatalogID": "rep:free-exercise-db:Chin-Up",
+      "exerciseName": "Chin-Up",
+      "equipment": "bodyweight",
+      "youtubeVideoId": "mRy9m2Q9_1I",
+      "title": "Proper Chin-Up Form",
+      "channel": "KILO Personal Trainer & Strength Coach Education",
+      "verifiedAt": "2026-07-21"
     },
     {
       "exerciseId": "rep:free-exercise-db:Clean",
@@ -2148,6 +1648,16 @@
       "verifiedAt": "2026-07-16"
     },
     {
+      "exerciseId": "rep:free-exercise-db:Cross-Body_Crunch",
+      "bundledCatalogID": "rep:free-exercise-db:Cross-Body_Crunch",
+      "exerciseName": "Cross-Body Crunch",
+      "equipment": "bodyweight",
+      "youtubeVideoId": "aBd6T01PBqw",
+      "title": "How to PROPERLY Perform A Cable Crunch to Shape Your Abs (Kneeling Cable Abdominal Crunch)",
+      "channel": "Colossus Fitness",
+      "verifiedAt": "2026-07-16"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:Cross_Body_Hammer_Curl",
       "bundledCatalogID": "rep:free-exercise-db:Cross_Body_Hammer_Curl",
       "exerciseName": "Cross Body Hammer Curl",
@@ -2165,16 +1675,6 @@
       "youtubeVideoId": "pdVPX8Tvqo8",
       "title": "Don't Train With Bands For Muscle Growth",
       "channel": "Renaissance Periodization",
-      "verifiedAt": "2026-07-16"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:Cross-Body_Crunch",
-      "bundledCatalogID": "rep:free-exercise-db:Cross-Body_Crunch",
-      "exerciseName": "Cross-Body Crunch",
-      "equipment": "bodyweight",
-      "youtubeVideoId": "aBd6T01PBqw",
-      "title": "How to PROPERLY Perform A Cable Crunch to Shape Your Abs (Kneeling Cable Abdominal Crunch)",
-      "channel": "Colossus Fitness",
       "verifiedAt": "2026-07-16"
     },
     {
@@ -2246,6 +1746,16 @@
       "title": "Dead Bug",
       "channel": "E3 Rehab Exercise Library",
       "verifiedAt": "2026-07-16"
+    },
+    {
+      "exerciseId": "rep:local:deadlift",
+      "bundledCatalogID": null,
+      "exerciseName": "Deadlift",
+      "equipment": "barbell",
+      "youtubeVideoId": "xgusDooVfKU",
+      "title": "How to do a Romanian Deadlift (Barbell) | Proper Form & Technique | NASM",
+      "channel": "National Academy of Sports Medicine (NASM)",
+      "verifiedAt": "2026-07-21"
     },
     {
       "exerciseId": "rep:free-exercise-db:Deadlift_with_Bands",
@@ -2386,6 +1896,15 @@
       "title": "5 Tips To Improve Your Box Jump || Grow Ep.6",
       "channel": "Colossus Fitness",
       "verifiedAt": "2026-07-16"
+    },
+    {
+      "exerciseId": "rep:local:dip",
+      "exerciseName": "Dip",
+      "equipment": "bodyweight",
+      "youtubeVideoId": "yN6Q1UI_xkE",
+      "title": "How To Do Dips For A Bigger Chest and Shoulders (Fix Mistakes!)",
+      "channel": "Jeff Nippard",
+      "verifiedAt": "2026-07-15"
     },
     {
       "exerciseId": "rep:free-exercise-db:Dip_Machine",
@@ -2546,6 +2065,15 @@
       "title": "7 Things That Helped My Shoulders Grow",
       "channel": "Jeff Nippard",
       "verifiedAt": "2026-07-16"
+    },
+    {
+      "exerciseId": "rep:local:dumbbell-lateral-raise",
+      "exerciseName": "Dumbbell Lateral Raise",
+      "equipment": "other",
+      "youtubeVideoId": "ZpSMEgdyYa4",
+      "title": "Try this lateral raise variant to stimulate stretch-mediated hypertrophy",
+      "channel": "Menno Henselmans",
+      "verifiedAt": "2026-07-15"
     },
     {
       "exerciseId": "rep:free-exercise-db:Dumbbell_Lunges",
@@ -2868,6 +2396,25 @@
       "verifiedAt": "2026-07-16"
     },
     {
+      "exerciseId": "rep:free-exercise-db:Face_Pull",
+      "bundledCatalogID": "rep:free-exercise-db:Face_Pull",
+      "exerciseName": "Face Pull",
+      "equipment": "cable",
+      "youtubeVideoId": "jF5CK2nk0p8",
+      "title": "The Banded Face Pull: Gym Shorts (How To)",
+      "channel": "Barbell Logic",
+      "verifiedAt": "2026-07-21"
+    },
+    {
+      "exerciseId": "rep:local:farmer-carry",
+      "exerciseName": "Farmer Carry",
+      "equipment": "other",
+      "youtubeVideoId": "7D96dK6oaP8",
+      "title": "Core Stability: Side  Bends or Suitcase Carry? |#AskSquatU Show Ep. 47|",
+      "channel": "Squat University",
+      "verifiedAt": "2026-07-15"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:Farmers_Walk",
       "bundledCatalogID": "rep:free-exercise-db:Farmers_Walk",
       "exerciseName": "Farmer's Walk",
@@ -3118,6 +2665,15 @@
       "verifiedAt": "2026-07-16"
     },
     {
+      "exerciseId": "rep:local:front-squat",
+      "exerciseName": "Front Squat",
+      "equipment": "barbell",
+      "youtubeVideoId": "v-mQm_droHg",
+      "title": "HOW TO FRONT SQUAT: Build Bigger Quads & A Stronger Squat",
+      "channel": "Jeff Nippard",
+      "verifiedAt": "2026-07-15"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:Front_Squat_Clean_Grip",
       "bundledCatalogID": "rep:free-exercise-db:Front_Squat_Clean_Grip",
       "exerciseName": "Front Squat (Clean Grip)",
@@ -3168,6 +2724,16 @@
       "verifiedAt": "2026-07-16"
     },
     {
+      "exerciseId": "rep:free-exercise-db:Goblet_Squat",
+      "bundledCatalogID": "rep:free-exercise-db:Goblet_Squat",
+      "exerciseName": "Goblet Squat",
+      "equipment": "kettlebell",
+      "youtubeVideoId": "6mf0oa2GGUc",
+      "title": "Goblet Squat Tutorial - Proper Form and Technique",
+      "channel": "Runna",
+      "verifiedAt": "2026-07-21"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:Good_Morning",
       "bundledCatalogID": "rep:free-exercise-db:Good_Morning",
       "exerciseName": "Good Morning",
@@ -3208,6 +2774,15 @@
       "verifiedAt": "2026-07-16"
     },
     {
+      "exerciseId": "rep:local:hammer-curl",
+      "exerciseName": "Hammer Curl",
+      "equipment": "other",
+      "youtubeVideoId": "G7hy-AxQwcQ",
+      "title": "How To PROPERLY Hammer Curl For Bigger Biceps (FIX YOUR FORM NOW)",
+      "channel": "Colossus Fitness",
+      "verifiedAt": "2026-07-15"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:Hammer_Curls",
       "bundledCatalogID": "rep:free-exercise-db:Hammer_Curls",
       "exerciseName": "Hammer Curls",
@@ -3228,9 +2803,9 @@
       "verifiedAt": "2026-07-16"
     },
     {
-      "exerciseId": "rep:free-exercise-db:Hamstring_Stretch",
-      "bundledCatalogID": "rep:free-exercise-db:Hamstring_Stretch",
-      "exerciseName": "Hamstring Stretch",
+      "exerciseId": "rep:free-exercise-db:Hamstring-SMR",
+      "bundledCatalogID": "rep:free-exercise-db:Hamstring-SMR",
+      "exerciseName": "Hamstring-SMR",
       "equipment": "other",
       "youtubeVideoId": "0a_fVS2s4Ho",
       "title": "The Most Effective Way to Train HAMSTRINGS | Training Science Explained",
@@ -3238,9 +2813,9 @@
       "verifiedAt": "2026-07-16"
     },
     {
-      "exerciseId": "rep:free-exercise-db:Hamstring-SMR",
-      "bundledCatalogID": "rep:free-exercise-db:Hamstring-SMR",
-      "exerciseName": "Hamstring-SMR",
+      "exerciseId": "rep:free-exercise-db:Hamstring_Stretch",
+      "bundledCatalogID": "rep:free-exercise-db:Hamstring_Stretch",
+      "exerciseName": "Hamstring Stretch",
       "equipment": "other",
       "youtubeVideoId": "0a_fVS2s4Ho",
       "title": "The Most Effective Way to Train HAMSTRINGS | Training Science Explained",
@@ -3296,6 +2871,16 @@
       "title": "Hanging For Spine Decompression: Good or Terrible?",
       "channel": "Squat University",
       "verifiedAt": "2026-07-16"
+    },
+    {
+      "exerciseId": "rep:free-exercise-db:Hanging_Leg_Raise",
+      "bundledCatalogID": "rep:free-exercise-db:Hanging_Leg_Raise",
+      "exerciseName": "Hanging Leg Raise",
+      "equipment": "bodyweight",
+      "youtubeVideoId": "_jLskVdzS4o",
+      "title": "Hanging leg raise tutorial",
+      "channel": "The Movement Collective",
+      "verifiedAt": "2026-07-21"
     },
     {
       "exerciseId": "rep:free-exercise-db:Hanging_Pike",
@@ -3356,6 +2941,15 @@
       "title": "How To Build Great Glutes with Perfect Hip Thrust Technique (Fix Mistakes!)",
       "channel": "Jeff Nippard",
       "verifiedAt": "2026-07-17"
+    },
+    {
+      "exerciseId": "rep:local:hip-thrust",
+      "exerciseName": "Hip Thrust",
+      "equipment": "other",
+      "youtubeVideoId": "xDmFkJxPzeM",
+      "title": "How To Build Great Glutes with Perfect Hip Thrust Technique (Fix Mistakes!)",
+      "channel": "Jeff Nippard",
+      "verifiedAt": "2026-07-15"
     },
     {
       "exerciseId": "rep:free-exercise-db:Hug_A_Ball",
@@ -3798,6 +3392,15 @@
       "verifiedAt": "2026-07-17"
     },
     {
+      "exerciseId": "UHJlbu3",
+      "exerciseName": "Kettlebell Swing",
+      "equipment": "kettlebell",
+      "youtubeVideoId": "rG_4uo5oQkk",
+      "title": "7 Kettlebell Exercises For FULL BODY Strength!",
+      "channel": "Squat University",
+      "verifiedAt": "2026-07-15"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:Kettlebell_Thruster",
       "bundledCatalogID": "rep:free-exercise-db:Kettlebell_Thruster",
       "exerciseName": "Kettlebell Thruster",
@@ -3868,16 +3471,6 @@
       "verifiedAt": "2026-07-17"
     },
     {
-      "exerciseId": "rep:free-exercise-db:Knee_Tuck_Jump",
-      "bundledCatalogID": "rep:free-exercise-db:Knee_Tuck_Jump",
-      "exerciseName": "Knee Tuck Jump",
-      "equipment": "bodyweight",
-      "youtubeVideoId": "W73Mc0Gil9A",
-      "title": "How To Squat Without Knee Pain (4 Mistakes You\u2019re Probably Making)",
-      "channel": "Jeremy Ethier",
-      "verifiedAt": "2026-07-17"
-    },
-    {
       "exerciseId": "rep:free-exercise-db:Knee_Hip_Raise_On_Parallel_Bars",
       "bundledCatalogID": "rep:free-exercise-db:Knee_Hip_Raise_On_Parallel_Bars",
       "exerciseName": "Knee/Hip Raise On Parallel Bars",
@@ -3885,6 +3478,16 @@
       "youtubeVideoId": "X-ACS9vpRyU",
       "title": "How To: Hanging Knee / Leg Raise | BUILD A \u201cSCIENCED BASED\u201d 6-PACK!",
       "channel": "ScottHermanFitness",
+      "verifiedAt": "2026-07-17"
+    },
+    {
+      "exerciseId": "rep:free-exercise-db:Knee_Tuck_Jump",
+      "bundledCatalogID": "rep:free-exercise-db:Knee_Tuck_Jump",
+      "exerciseName": "Knee Tuck Jump",
+      "equipment": "bodyweight",
+      "youtubeVideoId": "W73Mc0Gil9A",
+      "title": "How To Squat Without Knee Pain (4 Mistakes You\u2019re Probably Making)",
+      "channel": "Jeremy Ethier",
       "verifiedAt": "2026-07-17"
     },
     {
@@ -3998,6 +3601,15 @@
       "verifiedAt": "2026-07-17"
     },
     {
+      "exerciseId": "rep:local:leg-extension",
+      "exerciseName": "Leg Extension",
+      "equipment": "machine",
+      "youtubeVideoId": "hRZ5MM6gmlE",
+      "title": "The Leg Workout I Followed For My 1 Year Transformation",
+      "channel": "Jeff Nippard",
+      "verifiedAt": "2026-07-15"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:Leg_Extensions",
       "bundledCatalogID": "rep:free-exercise-db:Leg_Extensions",
       "exerciseName": "Leg Extensions",
@@ -4018,16 +3630,6 @@
       "verifiedAt": "2026-07-17"
     },
     {
-      "exerciseId": "rep:free-exercise-db:Leg_Pull-In",
-      "bundledCatalogID": "rep:free-exercise-db:Leg_Pull-In",
-      "exerciseName": "Leg Pull-In",
-      "equipment": "bodyweight",
-      "youtubeVideoId": "p40iUjf02j0",
-      "title": "Build A STRONG & Muscular Back With Pull Ups (TOP SECRET METHOD)",
-      "channel": "Squat University",
-      "verifiedAt": "2026-07-17"
-    },
-    {
       "exerciseId": "rep:free-exercise-db:Leg-Over_Floor_Press",
       "bundledCatalogID": "rep:free-exercise-db:Leg-Over_Floor_Press",
       "exerciseName": "Leg-Over Floor Press",
@@ -4035,6 +3637,16 @@
       "youtubeVideoId": "_RlRDWO2jfg",
       "title": "Build Bigger Shoulders With Perfect Training Technique (The Overhead Press)",
       "channel": "Jeff Nippard",
+      "verifiedAt": "2026-07-17"
+    },
+    {
+      "exerciseId": "rep:free-exercise-db:Leg_Pull-In",
+      "bundledCatalogID": "rep:free-exercise-db:Leg_Pull-In",
+      "exerciseName": "Leg Pull-In",
+      "equipment": "bodyweight",
+      "youtubeVideoId": "p40iUjf02j0",
+      "title": "Build A STRONG & Muscular Back With Pull Ups (TOP SECRET METHOD)",
+      "channel": "Squat University",
       "verifiedAt": "2026-07-17"
     },
     {
@@ -4188,6 +3800,15 @@
       "verifiedAt": "2026-07-17"
     },
     {
+      "exerciseId": "rep:local:lunge",
+      "exerciseName": "Lunge",
+      "equipment": "other",
+      "youtubeVideoId": "NcDtORTfVNQ",
+      "title": "How to PROPERLY Barbell Lunge (AVOID THESE MISTAKES)",
+      "channel": "Colossus Fitness",
+      "verifiedAt": "2026-07-15"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:Lunge_Pass_Through",
       "bundledCatalogID": "rep:free-exercise-db:Lunge_Pass_Through",
       "exerciseName": "Lunge Pass Through",
@@ -4286,6 +3907,15 @@
       "title": "Lying Leg Curl",
       "channel": "Renaissance Periodization",
       "verifiedAt": "2026-07-17"
+    },
+    {
+      "exerciseId": "rep:local:lying-leg-curl",
+      "exerciseName": "Lying Leg Curl",
+      "equipment": "machine",
+      "youtubeVideoId": "8zWDuWKdBZU",
+      "title": "The Perfect Leg Day (According To Science)",
+      "channel": "Jeff Nippard",
+      "verifiedAt": "2026-07-15"
     },
     {
       "exerciseId": "rep:free-exercise-db:Lying_Leg_Curls",
@@ -4388,6 +4018,15 @@
       "verifiedAt": "2026-07-17"
     },
     {
+      "exerciseId": "rep:local:machine-chest-press",
+      "exerciseName": "Machine Chest Press",
+      "equipment": "machine",
+      "youtubeVideoId": "ptpmRrzRtWQ",
+      "title": "The Fastest Way To Blow Up Your Bench Press (4 Science-Based Steps) + Sample Program",
+      "channel": "Jeff Nippard",
+      "verifiedAt": "2026-07-15"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:Machine_Preacher_Curls",
       "bundledCatalogID": "rep:free-exercise-db:Machine_Preacher_Curls",
       "exerciseName": "Machine Preacher Curls",
@@ -4406,6 +4045,15 @@
       "title": "Build Bigger Shoulders With Perfect Training Technique (The Overhead Press)",
       "channel": "Jeff Nippard",
       "verifiedAt": "2026-07-17"
+    },
+    {
+      "exerciseId": "rep:local:machine-shoulder-press",
+      "exerciseName": "Machine Shoulder Press",
+      "equipment": "machine",
+      "youtubeVideoId": "21lYP86dHW4",
+      "title": "Top 3 Shoulder Exercises For 3D Delts",
+      "channel": "Jeff Nippard",
+      "verifiedAt": "2026-07-15"
     },
     {
       "exerciseId": "rep:free-exercise-db:Machine_Triceps_Extension",
@@ -4558,16 +4206,6 @@
       "verifiedAt": "2026-07-17"
     },
     {
-      "exerciseId": "rep:free-exercise-db:On_Your_Side_Quad_Stretch",
-      "bundledCatalogID": "rep:free-exercise-db:On_Your_Side_Quad_Stretch",
-      "exerciseName": "On Your Side Quad Stretch",
-      "equipment": "other",
-      "youtubeVideoId": "sOuKeVuej9E",
-      "title": "How To Unlock Your Mobility in 5 Minutes (DAILY STRETCH)",
-      "channel": "Jeremy Ethier",
-      "verifiedAt": "2026-07-17"
-    },
-    {
       "exerciseId": "rep:free-exercise-db:On-Your-Back_Quad_Stretch",
       "bundledCatalogID": "rep:free-exercise-db:On-Your-Back_Quad_Stretch",
       "exerciseName": "On-Your-Back Quad Stretch",
@@ -4575,6 +4213,16 @@
       "youtubeVideoId": "4Jz6kz-RG6U",
       "title": "These squats will train your quads like no other",
       "channel": "Menno Henselmans",
+      "verifiedAt": "2026-07-17"
+    },
+    {
+      "exerciseId": "rep:free-exercise-db:On_Your_Side_Quad_Stretch",
+      "bundledCatalogID": "rep:free-exercise-db:On_Your_Side_Quad_Stretch",
+      "exerciseName": "On Your Side Quad Stretch",
+      "equipment": "other",
+      "youtubeVideoId": "sOuKeVuej9E",
+      "title": "How To Unlock Your Mobility in 5 Minutes (DAILY STRETCH)",
+      "channel": "Jeremy Ethier",
       "verifiedAt": "2026-07-17"
     },
     {
@@ -4618,74 +4266,23 @@
       "verifiedAt": "2026-07-17"
     },
     {
-      "exerciseId": "rep:free-exercise-db:One_Arm_Floor_Press",
-      "bundledCatalogID": "rep:free-exercise-db:One_Arm_Floor_Press",
-      "exerciseName": "One Arm Floor Press",
-      "equipment": "barbell",
-      "youtubeVideoId": "ZB_EuZ_J1mM",
-      "title": "The BEST Bench Press Warm Up Routine",
-      "channel": "Squat University",
-      "verifiedAt": "2026-07-17"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:One_Arm_Lat_Pulldown",
-      "bundledCatalogID": "rep:free-exercise-db:One_Arm_Lat_Pulldown",
-      "exerciseName": "One Arm Lat Pulldown",
-      "equipment": "cable",
-      "youtubeVideoId": "ZxgD_89klTQ",
-      "title": "How to PROPERLY Lat Pulldown | FIX YOUR LAT PULLDOWN NOW! (Updated)",
-      "channel": "Colossus Fitness",
-      "verifiedAt": "2026-07-17"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:One_Arm_Pronated_Dumbbell_Triceps_Extension",
-      "bundledCatalogID": "rep:free-exercise-db:One_Arm_Pronated_Dumbbell_Triceps_Extension",
-      "exerciseName": "One Arm Pronated Dumbbell Triceps Extension",
+      "exerciseId": "rep:free-exercise-db:One-Arm_Dumbbell_Row",
+      "bundledCatalogID": "rep:free-exercise-db:One-Arm_Dumbbell_Row",
+      "exerciseName": "One-Arm Dumbbell Row",
       "equipment": "dumbbell",
-      "youtubeVideoId": "1u18yJELsh0",
-      "title": "Cable Overhead Triceps Extension",
-      "channel": "Renaissance Periodization",
-      "verifiedAt": "2026-07-17"
+      "youtubeVideoId": "dFzUjzfih7k",
+      "title": "How to do the SINGLE ARM DUMBBELL ROW! | 2 Minute Tutorial",
+      "channel": "Max Euceda",
+      "verifiedAt": "2026-07-21"
     },
     {
-      "exerciseId": "rep:free-exercise-db:One_Arm_Supinated_Dumbbell_Triceps_Extension",
-      "bundledCatalogID": "rep:free-exercise-db:One_Arm_Supinated_Dumbbell_Triceps_Extension",
-      "exerciseName": "One Arm Supinated Dumbbell Triceps Extension",
-      "equipment": "dumbbell",
-      "youtubeVideoId": "2jl4M0Dnq4c",
-      "title": "How to PROPERLY Single Arm Overhead Dumbbell Tricep Extension",
-      "channel": "Colossus Fitness",
-      "verifiedAt": "2026-07-17"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:One_Handed_Hang",
-      "bundledCatalogID": "rep:free-exercise-db:One_Handed_Hang",
-      "exerciseName": "One Handed Hang",
+      "exerciseId": "rep:local:one-arm-dumbbell-row",
+      "exerciseName": "One-Arm Dumbbell Row",
       "equipment": "other",
-      "youtubeVideoId": "qpRGnTTcLpo",
-      "title": "7 Amazing Exercises No One Does (ALL S TIER)",
+      "youtubeVideoId": "djKXLt7kv7Q",
+      "title": "How To Do Dumbbell Rows: Build a Thicker Back With Proper \"Cheating\"",
       "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-17"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:One_Knee_To_Chest",
-      "bundledCatalogID": "rep:free-exercise-db:One_Knee_To_Chest",
-      "exerciseName": "One Knee To Chest",
-      "equipment": "other",
-      "youtubeVideoId": "qpRGnTTcLpo",
-      "title": "7 Amazing Exercises No One Does (ALL S TIER)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-17"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:One_Leg_Barbell_Squat",
-      "bundledCatalogID": "rep:free-exercise-db:One_Leg_Barbell_Squat",
-      "exerciseName": "One Leg Barbell Squat",
-      "equipment": "barbell",
-      "youtubeVideoId": "bEv6CCg2BC8",
-      "title": "How To Get A Huge Squat With Perfect Technique (Fix Mistakes)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-17"
+      "verifiedAt": "2026-07-15"
     },
     {
       "exerciseId": "rep:free-exercise-db:One-Arm_Flat_Bench_Dumbbell_Flye",
@@ -4695,6 +4292,16 @@
       "youtubeVideoId": "eozdVDA78K0",
       "title": "How To: Dumbbell Flys On A Flat Bench",
       "channel": "ScottHermanFitness",
+      "verifiedAt": "2026-07-17"
+    },
+    {
+      "exerciseId": "rep:free-exercise-db:One_Arm_Floor_Press",
+      "bundledCatalogID": "rep:free-exercise-db:One_Arm_Floor_Press",
+      "exerciseName": "One Arm Floor Press",
+      "equipment": "barbell",
+      "youtubeVideoId": "ZB_EuZ_J1mM",
+      "title": "The BEST Bench Press Warm Up Routine",
+      "channel": "Squat University",
       "verifiedAt": "2026-07-17"
     },
     {
@@ -4828,6 +4435,16 @@
       "verifiedAt": "2026-07-17"
     },
     {
+      "exerciseId": "rep:free-exercise-db:One_Arm_Lat_Pulldown",
+      "bundledCatalogID": "rep:free-exercise-db:One_Arm_Lat_Pulldown",
+      "exerciseName": "One Arm Lat Pulldown",
+      "equipment": "cable",
+      "youtubeVideoId": "ZxgD_89klTQ",
+      "title": "How to PROPERLY Lat Pulldown | FIX YOUR LAT PULLDOWN NOW! (Updated)",
+      "channel": "Colossus Fitness",
+      "verifiedAt": "2026-07-17"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:One-Arm_Long_Bar_Row",
       "bundledCatalogID": "rep:free-exercise-db:One-Arm_Long_Bar_Row",
       "exerciseName": "One-Arm Long Bar Row",
@@ -4858,6 +4475,16 @@
       "verifiedAt": "2026-07-17"
     },
     {
+      "exerciseId": "rep:free-exercise-db:One_Arm_Pronated_Dumbbell_Triceps_Extension",
+      "bundledCatalogID": "rep:free-exercise-db:One_Arm_Pronated_Dumbbell_Triceps_Extension",
+      "exerciseName": "One Arm Pronated Dumbbell Triceps Extension",
+      "equipment": "dumbbell",
+      "youtubeVideoId": "1u18yJELsh0",
+      "title": "Cable Overhead Triceps Extension",
+      "channel": "Renaissance Periodization",
+      "verifiedAt": "2026-07-17"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:One-Arm_Side_Deadlift",
       "bundledCatalogID": "rep:free-exercise-db:One-Arm_Side_Deadlift",
       "exerciseName": "One-Arm Side Deadlift",
@@ -4875,6 +4502,46 @@
       "youtubeVideoId": "1oUF4jWNzSs",
       "title": "How To: One Arm Standing Shoulder Press (Improve Shoulder Symmetry and Strength)",
       "channel": "Colossus Fitness",
+      "verifiedAt": "2026-07-17"
+    },
+    {
+      "exerciseId": "rep:free-exercise-db:One_Arm_Supinated_Dumbbell_Triceps_Extension",
+      "bundledCatalogID": "rep:free-exercise-db:One_Arm_Supinated_Dumbbell_Triceps_Extension",
+      "exerciseName": "One Arm Supinated Dumbbell Triceps Extension",
+      "equipment": "dumbbell",
+      "youtubeVideoId": "2jl4M0Dnq4c",
+      "title": "How to PROPERLY Single Arm Overhead Dumbbell Tricep Extension",
+      "channel": "Colossus Fitness",
+      "verifiedAt": "2026-07-17"
+    },
+    {
+      "exerciseId": "rep:free-exercise-db:One_Handed_Hang",
+      "bundledCatalogID": "rep:free-exercise-db:One_Handed_Hang",
+      "exerciseName": "One Handed Hang",
+      "equipment": "other",
+      "youtubeVideoId": "qpRGnTTcLpo",
+      "title": "7 Amazing Exercises No One Does (ALL S TIER)",
+      "channel": "Jeff Nippard",
+      "verifiedAt": "2026-07-17"
+    },
+    {
+      "exerciseId": "rep:free-exercise-db:One_Knee_To_Chest",
+      "bundledCatalogID": "rep:free-exercise-db:One_Knee_To_Chest",
+      "exerciseName": "One Knee To Chest",
+      "equipment": "other",
+      "youtubeVideoId": "qpRGnTTcLpo",
+      "title": "7 Amazing Exercises No One Does (ALL S TIER)",
+      "channel": "Jeff Nippard",
+      "verifiedAt": "2026-07-17"
+    },
+    {
+      "exerciseId": "rep:free-exercise-db:One_Leg_Barbell_Squat",
+      "bundledCatalogID": "rep:free-exercise-db:One_Leg_Barbell_Squat",
+      "exerciseName": "One Leg Barbell Squat",
+      "equipment": "barbell",
+      "youtubeVideoId": "bEv6CCg2BC8",
+      "title": "How To Get A Huge Squat With Perfect Technique (Fix Mistakes)",
+      "channel": "Jeff Nippard",
       "verifiedAt": "2026-07-17"
     },
     {
@@ -4956,6 +4623,15 @@
       "title": "How To Build Huge Triceps with Optimal Training Technique",
       "channel": "Jeff Nippard",
       "verifiedAt": "2026-07-17"
+    },
+    {
+      "exerciseId": "rep:local:overhead-triceps-extension",
+      "exerciseName": "Overhead Triceps Extension",
+      "equipment": "other",
+      "youtubeVideoId": "OpRMRhr0Ycc",
+      "title": "The Best & Worst TRICEPS Exercises (Ranked Using Science)",
+      "channel": "Jeff Nippard",
+      "verifiedAt": "2026-07-15"
     },
     {
       "exerciseId": "rep:free-exercise-db:Pallof_Press",
@@ -5046,6 +4722,16 @@
       "title": "Benching Heavy & Squatting Heavier | Prepping for a Powerlifting Meet",
       "channel": "Colossus Fitness",
       "verifiedAt": "2026-07-17"
+    },
+    {
+      "exerciseId": "rep:free-exercise-db:Plank",
+      "bundledCatalogID": "rep:free-exercise-db:Plank",
+      "exerciseName": "Plank",
+      "equipment": "bodyweight",
+      "youtubeVideoId": "PcKxp-eWyII",
+      "title": "Correct Plank Technique in 60secs",
+      "channel": "Perform 360",
+      "verifiedAt": "2026-07-21"
     },
     {
       "exerciseId": "rep:free-exercise-db:Plate_Pinch",
@@ -5218,6 +4904,16 @@
       "verifiedAt": "2026-07-17"
     },
     {
+      "exerciseId": "lBDjFxJ",
+      "bundledCatalogID": null,
+      "exerciseName": "Pull-Up",
+      "equipment": "bodyweight",
+      "youtubeVideoId": "B_VkNQS5YLs",
+      "title": "How to do a Band Assisted Pull-Up | Proper Form & Technique | NASM",
+      "channel": "National Academy of Sports Medicine (NASM)",
+      "verifiedAt": "2026-07-21"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:Pullups",
       "bundledCatalogID": "rep:free-exercise-db:Pullups",
       "exerciseName": "Pullups",
@@ -5246,6 +4942,16 @@
       "title": "Snatch-Grip Behind The Neck Overhead Press | Exercise Guide",
       "channel": "Bodybuilding.com",
       "verifiedAt": "2026-07-17"
+    },
+    {
+      "exerciseId": "I4hDWkc",
+      "bundledCatalogID": null,
+      "exerciseName": "Push-Up",
+      "equipment": "bodyweight",
+      "youtubeVideoId": "WDIpL0pjun0",
+      "title": "How to do a Push-Up | Proper Form & Technique | NASM",
+      "channel": "National Academy of Sports Medicine (NASM)",
+      "verifiedAt": "2026-07-21"
     },
     {
       "exerciseId": "rep:free-exercise-db:Push_Up_to_Side_Plank",
@@ -5498,6 +5204,15 @@
       "verifiedAt": "2026-07-17"
     },
     {
+      "exerciseId": "rep:local:reverse-pec-deck",
+      "exerciseName": "Reverse Pec Deck",
+      "equipment": "machine",
+      "youtubeVideoId": "dC7jhEk-29A",
+      "title": "How to PROPERLY Reverse Pec Deck Fly (DO THIS)",
+      "channel": "Colossus Fitness",
+      "verifiedAt": "2026-07-15"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:Reverse_Plate_Curls",
       "bundledCatalogID": "rep:free-exercise-db:Reverse_Plate_Curls",
       "exerciseName": "Reverse Plate Curls",
@@ -5738,6 +5453,15 @@
       "verifiedAt": "2026-07-17"
     },
     {
+      "exerciseId": "rep:local:seated-cable-row",
+      "exerciseName": "Seated Cable Row",
+      "equipment": "cable",
+      "youtubeVideoId": "PAXkl-AdJFg",
+      "title": "How To Train Back WIDTH vs THICKNESS (Close vs Wide Grip? Rows or Pullups?)",
+      "channel": "Jeff Nippard",
+      "verifiedAt": "2026-07-15"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:Seated_Cable_Rows",
       "bundledCatalogID": "rep:free-exercise-db:Seated_Cable_Rows",
       "exerciseName": "Seated Cable Rows",
@@ -5756,6 +5480,16 @@
       "title": "The Best And Worst Shoulder Exercises",
       "channel": "Jeff Nippard",
       "verifiedAt": "2026-07-17"
+    },
+    {
+      "exerciseId": "rep:free-exercise-db:Seated_Calf_Raise",
+      "bundledCatalogID": "rep:free-exercise-db:Seated_Calf_Raise",
+      "exerciseName": "Seated Calf Raise",
+      "equipment": "machine",
+      "youtubeVideoId": "pz66Bw6HJ4s",
+      "title": "Seated Calf Raise Machine Tutorial",
+      "channel": "The Gym In The North",
+      "verifiedAt": "2026-07-21"
     },
     {
       "exerciseId": "rep:free-exercise-db:Seated_Calf_Stretch",
@@ -5876,6 +5610,16 @@
       "title": "Dynamic Seated Hamstring Stretch",
       "channel": "E3 Rehab Exercise Library",
       "verifiedAt": "2026-07-17"
+    },
+    {
+      "exerciseId": "rep:free-exercise-db:Seated_Leg_Curl",
+      "bundledCatalogID": "rep:free-exercise-db:Seated_Leg_Curl",
+      "exerciseName": "Seated Leg Curl",
+      "equipment": "machine",
+      "youtubeVideoId": "QjNFk4F5dAs",
+      "title": "How To Use The Prone Leg Curl Machine",
+      "channel": "PureGym",
+      "verifiedAt": "2026-07-21"
     },
     {
       "exerciseId": "rep:free-exercise-db:Seated_Leg_Tucks",
@@ -6108,6 +5852,26 @@
       "verifiedAt": "2026-07-17"
     },
     {
+      "exerciseId": "rep:free-exercise-db:Single-Arm_Cable_Crossover",
+      "bundledCatalogID": "rep:free-exercise-db:Single-Arm_Cable_Crossover",
+      "exerciseName": "Single-Arm Cable Crossover",
+      "equipment": "cable",
+      "youtubeVideoId": "J0bEKhnP-Mw",
+      "title": "Fixing The Single Leg RDL Problem (INCREDIBLE CHANGES)",
+      "channel": "Squat University",
+      "verifiedAt": "2026-07-17"
+    },
+    {
+      "exerciseId": "rep:free-exercise-db:Single-Arm_Push-Up",
+      "bundledCatalogID": "rep:free-exercise-db:Single-Arm_Push-Up",
+      "exerciseName": "Single-Arm Push-Up",
+      "equipment": "bodyweight",
+      "youtubeVideoId": "b6ouj88iBZs",
+      "title": "The Perfect Push Workout (According To Science)",
+      "channel": "Jeff Nippard",
+      "verifiedAt": "2026-07-17"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:Single_Dumbbell_Raise",
       "bundledCatalogID": "rep:free-exercise-db:Single_Dumbbell_Raise",
       "exerciseName": "Single Dumbbell Raise",
@@ -6135,36 +5899,6 @@
       "youtubeVideoId": "tl6xvm4-Qk0",
       "title": "How To Properly Perform The Glute Bridge |#AskSquatU Show Ep. 39|",
       "channel": "Squat University",
-      "verifiedAt": "2026-07-17"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:Single_Leg_Push-off",
-      "bundledCatalogID": "rep:free-exercise-db:Single_Leg_Push-off",
-      "exerciseName": "Single Leg Push-off",
-      "equipment": "other",
-      "youtubeVideoId": "qVek72z3F1U",
-      "title": "The Smartest Push Pull Legs Routine (Fully Explained)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-17"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:Single-Arm_Cable_Crossover",
-      "bundledCatalogID": "rep:free-exercise-db:Single-Arm_Cable_Crossover",
-      "exerciseName": "Single-Arm Cable Crossover",
-      "equipment": "cable",
-      "youtubeVideoId": "J0bEKhnP-Mw",
-      "title": "Fixing The Single Leg RDL Problem (INCREDIBLE CHANGES)",
-      "channel": "Squat University",
-      "verifiedAt": "2026-07-17"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:Single-Arm_Push-Up",
-      "bundledCatalogID": "rep:free-exercise-db:Single-Arm_Push-Up",
-      "exerciseName": "Single-Arm Push-Up",
-      "equipment": "bodyweight",
-      "youtubeVideoId": "b6ouj88iBZs",
-      "title": "The Perfect Push Workout (According To Science)",
-      "channel": "Jeff Nippard",
       "verifiedAt": "2026-07-17"
     },
     {
@@ -6198,6 +5932,16 @@
       "verifiedAt": "2026-07-17"
     },
     {
+      "exerciseId": "rep:free-exercise-db:Single_Leg_Push-off",
+      "bundledCatalogID": "rep:free-exercise-db:Single_Leg_Push-off",
+      "exerciseName": "Single Leg Push-off",
+      "equipment": "other",
+      "youtubeVideoId": "qVek72z3F1U",
+      "title": "The Smartest Push Pull Legs Routine (Fully Explained)",
+      "channel": "Jeff Nippard",
+      "verifiedAt": "2026-07-17"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:Sit_Squats",
       "bundledCatalogID": "rep:free-exercise-db:Sit_Squats",
       "exerciseName": "Sit Squats",
@@ -6216,6 +5960,15 @@
       "title": "Sitting All Day? This One Exercise Fixes Everything!",
       "channel": "Squat University",
       "verifiedAt": "2026-07-17"
+    },
+    {
+      "exerciseId": "rep:local:skull-crusher",
+      "exerciseName": "Skull Crusher",
+      "equipment": "other",
+      "youtubeVideoId": "ZCSXngTm0ok",
+      "title": "How to PROPERLY Perform the Skull Crusher Exercise | Variation to Avoid Elbow Pain NOW!",
+      "channel": "Colossus Fitness",
+      "verifiedAt": "2026-07-15"
     },
     {
       "exerciseId": "rep:free-exercise-db:Sled_Drag_-_Harness",
@@ -6418,6 +6171,25 @@
       "verifiedAt": "2026-07-17"
     },
     {
+      "exerciseId": "rep:free-exercise-db:Smith_Machine_Squat",
+      "bundledCatalogID": "rep:free-exercise-db:Smith_Machine_Squat",
+      "exerciseName": "Smith Machine Squat",
+      "equipment": "machine",
+      "youtubeVideoId": "AHnX-aimA4E",
+      "title": "How To: Smith Machine- Squat",
+      "channel": "ScottHermanFitness",
+      "verifiedAt": "2026-07-21"
+    },
+    {
+      "exerciseId": "rep:local:smith-machine-squat",
+      "exerciseName": "Smith Machine Squat",
+      "equipment": "smithMachine",
+      "youtubeVideoId": "sdeQjm7avi8",
+      "title": "The Fastest Way To Blow Up Your Squat (4 Science-Based Steps)",
+      "channel": "Jeff Nippard",
+      "verifiedAt": "2026-07-15"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:Smith_Machine_Stiff-Legged_Deadlift",
       "bundledCatalogID": "rep:free-exercise-db:Smith_Machine_Stiff-Legged_Deadlift",
       "exerciseName": "Smith Machine Stiff-Legged Deadlift",
@@ -6608,6 +6380,16 @@
       "verifiedAt": "2026-07-17"
     },
     {
+      "exerciseId": "rep:local:squat",
+      "bundledCatalogID": null,
+      "exerciseName": "Squat",
+      "equipment": "barbell",
+      "youtubeVideoId": "S0H0JxLAOAY",
+      "title": "Barbell Squat Tutorial - Proper Form and Technique",
+      "channel": "Runna",
+      "verifiedAt": "2026-07-21"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:Squat_Jerk",
       "bundledCatalogID": "rep:free-exercise-db:Squat_Jerk",
       "exerciseName": "Squat Jerk",
@@ -6766,6 +6548,15 @@
       "title": "How to PROPERLY Cable Woodchopper Oblique Twist For Shredded Obliques",
       "channel": "Colossus Fitness",
       "verifiedAt": "2026-07-17"
+    },
+    {
+      "exerciseId": "rep:local:standing-calf-raise",
+      "exerciseName": "Standing Calf Raise",
+      "equipment": "machine",
+      "youtubeVideoId": "SVtg-1loH4c",
+      "title": "How to PROPERLY Standing Calf Raise | Tips & Common Mistakes",
+      "channel": "Colossus Fitness",
+      "verifiedAt": "2026-07-15"
     },
     {
       "exerciseId": "rep:free-exercise-db:Standing_Calf_Raises",
@@ -7108,6 +6899,26 @@
       "verifiedAt": "2026-07-17"
     },
     {
+      "exerciseId": "rep:free-exercise-db:Straight-Arm_Dumbbell_Pullover",
+      "bundledCatalogID": "rep:free-exercise-db:Straight-Arm_Dumbbell_Pullover",
+      "exerciseName": "Straight-Arm Dumbbell Pullover",
+      "equipment": "dumbbell",
+      "youtubeVideoId": "vJwAbr_pVVM",
+      "title": "How to PROPERLY Straight-Arm Lat Pulldown for Bigger Lats",
+      "channel": "Colossus Fitness",
+      "verifiedAt": "2026-07-17"
+    },
+    {
+      "exerciseId": "rep:free-exercise-db:Straight-Arm_Pulldown",
+      "bundledCatalogID": "rep:free-exercise-db:Straight-Arm_Pulldown",
+      "exerciseName": "Straight-Arm Pulldown",
+      "equipment": "cable",
+      "youtubeVideoId": "vJwAbr_pVVM",
+      "title": "How to PROPERLY Straight-Arm Lat Pulldown for Bigger Lats",
+      "channel": "Colossus Fitness",
+      "verifiedAt": "2026-07-17"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:Straight_Bar_Bench_Mid_Rows",
       "bundledCatalogID": "rep:free-exercise-db:Straight_Bar_Bench_Mid_Rows",
       "exerciseName": "Straight Bar Bench Mid Rows",
@@ -7128,24 +6939,14 @@
       "verifiedAt": "2026-07-17"
     },
     {
-      "exerciseId": "rep:free-exercise-db:Straight-Arm_Dumbbell_Pullover",
-      "bundledCatalogID": "rep:free-exercise-db:Straight-Arm_Dumbbell_Pullover",
-      "exerciseName": "Straight-Arm Dumbbell Pullover",
-      "equipment": "dumbbell",
-      "youtubeVideoId": "vJwAbr_pVVM",
-      "title": "How to PROPERLY Straight-Arm Lat Pulldown for Bigger Lats",
-      "channel": "Colossus Fitness",
-      "verifiedAt": "2026-07-17"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:Straight-Arm_Pulldown",
-      "bundledCatalogID": "rep:free-exercise-db:Straight-Arm_Pulldown",
-      "exerciseName": "Straight-Arm Pulldown",
-      "equipment": "cable",
-      "youtubeVideoId": "vJwAbr_pVVM",
-      "title": "How to PROPERLY Straight-Arm Lat Pulldown for Bigger Lats",
-      "channel": "Colossus Fitness",
-      "verifiedAt": "2026-07-17"
+      "exerciseId": "rep:free-exercise-db:Sumo_Deadlift",
+      "bundledCatalogID": "rep:free-exercise-db:Sumo_Deadlift",
+      "exerciseName": "Sumo Deadlift",
+      "equipment": "barbell",
+      "youtubeVideoId": "1ltxpKdXkG4",
+      "title": "Sumo Deadlift Tutorial - Proper Form and Technique",
+      "channel": "Runna",
+      "verifiedAt": "2026-07-21"
     },
     {
       "exerciseId": "rep:free-exercise-db:Sumo_Deadlift_with_Bands",
@@ -7348,6 +7149,15 @@
       "verifiedAt": "2026-07-17"
     },
     {
+      "exerciseId": "rep:local:tricep-pushdown",
+      "exerciseName": "Tricep Pushdown",
+      "equipment": "cable",
+      "youtubeVideoId": "OpRMRhr0Ycc",
+      "title": "The Best & Worst TRICEPS Exercises (Ranked Using Science)",
+      "channel": "Jeff Nippard",
+      "verifiedAt": "2026-07-15"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:Tricep_Side_Stretch",
       "bundledCatalogID": "rep:free-exercise-db:Tricep_Side_Stretch",
       "exerciseName": "Tricep Side Stretch",
@@ -7468,16 +7278,6 @@
       "verifiedAt": "2026-07-17"
     },
     {
-      "exerciseId": "rep:free-exercise-db:Upper_Back_Stretch",
-      "bundledCatalogID": "rep:free-exercise-db:Upper_Back_Stretch",
-      "exerciseName": "Upper Back Stretch",
-      "equipment": "other",
-      "youtubeVideoId": "jLvqKgW-_G8",
-      "title": "The Best And Worst Back Exercises (Ranked By Science)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-17"
-    },
-    {
       "exerciseId": "rep:free-exercise-db:Upper_Back-Leg_Grab",
       "bundledCatalogID": "rep:free-exercise-db:Upper_Back-Leg_Grab",
       "exerciseName": "Upper Back-Leg Grab",
@@ -7485,6 +7285,16 @@
       "youtubeVideoId": "ytFnYaoIkSg",
       "title": "Inverted Row Exercise Guide | Proper Form for Back & Upper Body Strength",
       "channel": "Colossus Fitness",
+      "verifiedAt": "2026-07-17"
+    },
+    {
+      "exerciseId": "rep:free-exercise-db:Upper_Back_Stretch",
+      "bundledCatalogID": "rep:free-exercise-db:Upper_Back_Stretch",
+      "exerciseName": "Upper Back Stretch",
+      "equipment": "other",
+      "youtubeVideoId": "jLvqKgW-_G8",
+      "title": "The Best And Worst Back Exercises (Ranked By Science)",
+      "channel": "Jeff Nippard",
       "verifiedAt": "2026-07-17"
     },
     {
@@ -7558,6 +7368,15 @@
       "verifiedAt": "2026-07-17"
     },
     {
+      "exerciseId": "rep:local:walking-lunge",
+      "exerciseName": "Walking Lunge",
+      "equipment": "other",
+      "youtubeVideoId": "rGpIVqAQc-Y",
+      "title": "Off-Season Leg Workout / 395x5 Squat / 100 lb Dumbbell Walking Lunges",
+      "channel": "Jeff Nippard",
+      "verifiedAt": "2026-07-15"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:Walking_Treadmill",
       "bundledCatalogID": "rep:free-exercise-db:Walking_Treadmill",
       "exerciseName": "Walking, Treadmill",
@@ -7618,6 +7437,15 @@
       "verifiedAt": "2026-07-17"
     },
     {
+      "exerciseId": "HMzLjXx",
+      "exerciseName": "Weighted Pull-Up",
+      "equipment": "other",
+      "youtubeVideoId": "Hdc7Mw6BIEE",
+      "title": "The Best Way To Do Pull Ups For A Wide Back (Optimal Training Technique)",
+      "channel": "Jeff Nippard",
+      "verifiedAt": "2026-07-15"
+    },
+    {
       "exerciseId": "rep:free-exercise-db:Weighted_Pull_Ups",
       "bundledCatalogID": "rep:free-exercise-db:Weighted_Pull_Ups",
       "exerciseName": "Weighted Pull Ups",
@@ -7655,26 +7483,6 @@
       "youtubeVideoId": "dCHLUtf--pg",
       "title": "Should The Knees Go Over the Toes? (Proper SQUAT Technique Explained)",
       "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-17"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:Wide_Stance_Barbell_Squat",
-      "bundledCatalogID": "rep:free-exercise-db:Wide_Stance_Barbell_Squat",
-      "exerciseName": "Wide Stance Barbell Squat",
-      "equipment": "barbell",
-      "youtubeVideoId": "bEv6CCg2BC8",
-      "title": "How To Get A Huge Squat With Perfect Technique (Fix Mistakes)",
-      "channel": "Jeff Nippard",
-      "verifiedAt": "2026-07-17"
-    },
-    {
-      "exerciseId": "rep:free-exercise-db:Wide_Stance_Stiff_Legs",
-      "bundledCatalogID": "rep:free-exercise-db:Wide_Stance_Stiff_Legs",
-      "exerciseName": "Wide Stance Stiff Legs",
-      "equipment": "barbell",
-      "youtubeVideoId": "1v4r9hht_K4",
-      "title": "How To: Sumo Deadlift (Wide Stance Deadlift)",
-      "channel": "ScottHermanFitness",
       "verifiedAt": "2026-07-17"
     },
     {
@@ -7745,6 +7553,26 @@
       "youtubeVideoId": "JCUVSsjP0F0",
       "title": "How To: Standing Zottman Dumbbell Curls | Muscle Gain Exercise",
       "channel": "Colossus Fitness",
+      "verifiedAt": "2026-07-17"
+    },
+    {
+      "exerciseId": "rep:free-exercise-db:Wide_Stance_Barbell_Squat",
+      "bundledCatalogID": "rep:free-exercise-db:Wide_Stance_Barbell_Squat",
+      "exerciseName": "Wide Stance Barbell Squat",
+      "equipment": "barbell",
+      "youtubeVideoId": "bEv6CCg2BC8",
+      "title": "How To Get A Huge Squat With Perfect Technique (Fix Mistakes)",
+      "channel": "Jeff Nippard",
+      "verifiedAt": "2026-07-17"
+    },
+    {
+      "exerciseId": "rep:free-exercise-db:Wide_Stance_Stiff_Legs",
+      "bundledCatalogID": "rep:free-exercise-db:Wide_Stance_Stiff_Legs",
+      "exerciseName": "Wide Stance Stiff Legs",
+      "equipment": "barbell",
+      "youtubeVideoId": "1v4r9hht_K4",
+      "title": "How To: Sumo Deadlift (Wide Stance Deadlift)",
+      "channel": "ScottHermanFitness",
       "verifiedAt": "2026-07-17"
     },
     {
